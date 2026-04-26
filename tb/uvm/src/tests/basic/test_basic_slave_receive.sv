@@ -10,6 +10,8 @@ class test_basic_slave_receive extends base_test;
   endfunction
 
   task run_phase(uvm_phase phase);
+    bit [31:0] rxflr;
+    bit [31:0] rx_data;
     phase.raise_objection(this);
     `uvm_info("TEST_BASIC_SLAVE_RECEIVE", "Starting Slave Receive Test...", UVM_MEDIUM)
 
@@ -34,12 +36,10 @@ class test_basic_slave_receive extends base_test;
     #50us;
 
     // Check RXFLR for received data
-    bit [31:0] rxflr;
     apb_read(8'h40, rxflr);
     `uvm_info("TEST_BASIC_SLAVE_RECEIVE", $sformatf("RXFLR=0x%08h", rxflr), UVM_MEDIUM)
 
     // Read received data from RX FIFO
-    bit [31:0] rx_data;
     apb_read(8'h0C, rx_data);
     `uvm_info("TEST_BASIC_SLAVE_RECEIVE", $sformatf("RX DATA=0x%02x (expected 0xCC)", rx_data[7:0]), UVM_MEDIUM)
 

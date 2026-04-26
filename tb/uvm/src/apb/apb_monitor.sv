@@ -19,8 +19,8 @@ class apb_monitor extends uvm_monitor;
   endfunction
 
   task run_phase(uvm_phase phase);
+    reg [31:0] captured_data;
     apb_transfer tr;
-    bit [31:0] captured_data;
 
     forever begin
       @(posedge vif.pclk);

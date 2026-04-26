@@ -9,6 +9,7 @@ class test_reg_con_write_read extends base_test;
   endfunction
 
   task run_phase(uvm_phase phase);
+    bit [31:0] con_val;
     phase.raise_objection(this);
     `uvm_info("TEST_REG_CON_WRITE_READ", "Starting CON Register Write/Read Test...", UVM_MEDIUM)
 
@@ -23,7 +24,6 @@ class test_reg_con_write_read extends base_test;
 
     // Test 1: Pure Master mode (MASTER_MODE=1, SLAVE_DISABLE=1)
     apb_write(8'h00, 12'h43);  // MASTER_MODE=1, SPEED=2, RESTART_EN=1, SLAVE_DISABLE=1
-    bit [31:0] con_val;
     apb_read(8'h00, con_val);
     `uvm_info("TEST_REG_CON_WRITE_READ", $sformatf("CON after write 0x43: 0x%08h", con_val), UVM_MEDIUM)
     if (con_val[0] !== 1'b1)

@@ -10,6 +10,7 @@ class test_basic_slave_transmit extends base_test;
   endfunction
 
   task run_phase(uvm_phase phase);
+    bit [31:0] txflr;
     phase.raise_objection(this);
     `uvm_info("TEST_BASIC_SLAVE_TRANSMIT", "Starting Slave Transmit Test...", UVM_MEDIUM)
 
@@ -37,7 +38,6 @@ class test_basic_slave_transmit extends base_test;
     #50us;
 
     // Check TXFLR (should be 0 after TX data consumed)
-    bit [31:0] txflr;
     apb_read(8'h3C, txflr);
     `uvm_info("TEST_BASIC_SLAVE_TRANSMIT", $sformatf("TXFLR=0x%08h", txflr), UVM_MEDIUM)
 

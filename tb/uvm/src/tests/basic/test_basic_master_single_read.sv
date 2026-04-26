@@ -10,6 +10,7 @@ class test_basic_master_single_read extends base_test;
   endfunction
 
   task run_phase(uvm_phase phase);
+    bit [31:0] rx_data;
     phase.raise_objection(this);
     `uvm_info("TEST_BASIC_MASTER_SINGLE_READ", "Starting Master Single Read Test...", UVM_MEDIUM)
 
@@ -26,7 +27,6 @@ class test_basic_master_single_read extends base_test;
     #100us;
 
     // Read RX FIFO to get received data
-    bit [31:0] rx_data;
     apb_read(8'h0C, rx_data);
     `uvm_info("TEST_BASIC_MASTER_SINGLE_READ", $sformatf("RX DATA_CMD=0x%08h", rx_data), UVM_MEDIUM)
 

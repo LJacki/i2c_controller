@@ -9,6 +9,9 @@ class test_reg_hcnt_lcnt_speed extends base_test;
   endfunction
 
   task run_phase(uvm_phase phase);
+    bit [31:0] hcnt_val;
+    bit [31:0] lcnt_val;
+    bit [31:0] con_val;
     phase.raise_objection(this);
     `uvm_info("TEST_REG_HCNT_LCNT_SPEED", "Starting HCNT/LCNT Speed Register Test...", UVM_MEDIUM)
 
@@ -19,7 +22,6 @@ class test_reg_hcnt_lcnt_speed extends base_test;
 
     // Write SS_HCNT (0x10)
     apb_write(8'h10, 16'd400);  // Standard SCL high count
-    bit [31:0] hcnt_val;
     apb_read(8'h10, hcnt_val);
     `uvm_info("TEST_REG_HCNT_LCNT_SPEED", $sformatf("SS_HCNT written=400, read=0x%08h", hcnt_val), UVM_MEDIUM)
     if (hcnt_val[15:0] !== 16'd400)
@@ -27,7 +29,6 @@ class test_reg_hcnt_lcnt_speed extends base_test;
 
     // Write SS_LCNT (0x14)
     apb_write(8'h14, 16'd400);  // Standard SCL low count
-    bit [31:0] lcnt_val;
     apb_read(8'h14, lcnt_val);
     `uvm_info("TEST_REG_HCNT_LCNT_SPEED", $sformatf("SS_LCNT written=400, read=0x%08h", lcnt_val), UVM_MEDIUM)
     if (lcnt_val[15:0] !== 16'd400)
@@ -48,7 +49,6 @@ class test_reg_hcnt_lcnt_speed extends base_test;
     apb_write(8'h00, 12'h01);  // MASTER_MODE=1, SPEED=01
     // Set CON to Fast mode (SPEED=10)
     apb_write(8'h00, 12'h03);  // MASTER_MODE=1, SPEED=10
-    bit [31:0] con_val;
     apb_read(8'h00, con_val);
     `uvm_info("TEST_REG_HCNT_LCNT_SPEED", $sformatf("CON SPEED=10 (Fast): 0x%08h", con_val), UVM_MEDIUM)
     if (con_val[2:1] !== 2'b10)

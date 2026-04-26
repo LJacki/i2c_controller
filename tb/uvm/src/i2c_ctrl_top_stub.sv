@@ -21,18 +21,18 @@ module i2c_ctrl_top (
 );
 
   // Register file (v2.2 addresses)
-  reg [31:0] CON, TAR, SAR, DATA_CMD;
-  reg [15:0] SS_HCNT, SS_LCNT, FS_HCNT, FS_LCNT;
-  reg [31:0] INTR_MASK;
-  reg [31:0] INTR_STAT;    // 0x24 (post-mask)
-  reg [31:0] RAW_INTR_STAT; // 0x28 (pre-mask)
-  reg [4:0] RX_TL, TX_TL;  // 0x2C, 0x30
-  reg [1:0] ENABLE;         // 0x34
-  reg [31:0] STATUS;        // 0x38 (RO)
-  reg [4:0] TXFLR, RXFLR;  // 0x3C, 0x40 (RO)
-  reg [15:0] SDA_HOLD;     // 0x44
-  reg [15:0] TX_ABRT_SOURCE; // 0x48 (RO, clr on read)
-  reg [2:0]  ENABLE_STATUS;  // 0x4C (RO)
+  logic [31:0] CON, TAR, SAR, DATA_CMD;
+  logic [15:0] SS_HCNT, SS_LCNT, FS_HCNT, FS_LCNT;
+  logic [31:0] INTR_MASK;
+  logic [31:0] INTR_STAT;    // 0x24 (post-mask)
+  logic [31:0] RAW_INTR_STAT; // 0x28 (pre-mask)
+  logic [4:0] RX_TL, TX_TL;  // 0x2C, 0x30
+  logic [1:0] ENABLE;         // 0x34
+  logic [31:0] STATUS;        // 0x38 (RO)
+  logic [4:0] TXFLR, RXFLR;  // 0x3C, 0x40 (RO)
+  logic [15:0] SDA_HOLD;     // 0x44
+  logic [15:0] TX_ABRT_SOURCE; // 0x48 (RO, clr on read)
+  logic [2:0]  ENABLE_STATUS;  // 0x4C (RO)
 
   wire [10:0] raw_intr;
   assign raw_intr = 11'b0;  // stub: all zero

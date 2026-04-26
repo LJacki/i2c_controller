@@ -9,10 +9,6 @@ package i2c_ctrl_pkg;
   // Include macros
   `include "uvm_macros.svh"
 
-  // Interfaces
-  `include "apb/apb_if.sv"
-  `include "i2c/i2c_if.sv"
-
   // APB components
   `include "apb/apb_transfer.sv"
   `include "apb/apb_driver.sv"

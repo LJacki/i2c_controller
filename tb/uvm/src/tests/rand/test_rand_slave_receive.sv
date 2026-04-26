@@ -19,6 +19,8 @@ class test_rand_slave_receive extends base_test;
   endfunction
 
   task run_phase(uvm_phase phase);
+    bit [31:0] rxflr;
+      bit [31:0] rx_data;
     phase.raise_objection(this);
     `uvm_info("TEST_RAND_SLAVE_RECEIVE", "Starting Random Slave Receive Test...", UVM_MEDIUM)
 
@@ -59,13 +61,11 @@ class test_rand_slave_receive extends base_test;
     #100us;
 
     // Check RXFLR
-    bit [31:0] rxflr;
     apb_read(8'h40, rxflr);
     `uvm_info("TEST_RAND_SLAVE_RECEIVE", $sformatf("RXFLR=0x%08h", rxflr), UVM_MEDIUM)
 
     // Read received data
     for (int i = 0; i < rand_byte_count; i++) begin
-      bit [31:0] rx_data;
       apb_read(8'h0C, rx_data);
       `uvm_info("TEST_RAND_SLAVE_RECEIVE", $sformatf("RX[%0d]=0x%02x (expected 0x%02x)", i, rx_data[7:0], rand_data[i]), UVM_MEDIUM)
     end

@@ -20,17 +20,20 @@ class test_rand_reg_access extends base_test;
   endfunction
 
   task run_phase(uvm_phase phase);
+      bit [7:0] addr = reg_addrs[$urandom_range(0, reg_addrs.size()-1)];
+      bit [31:0] wdata = $urandom();
+      bit [31:0] rdata;
+      bit is_write = $urandom_range(0, 1);
+      bit [31:0] val;
+      bit [31:0] val;
+      bit [31:0] val;
     phase.raise_objection(this);
     `uvm_info("TEST_RAND_REG_ACCESS", "Starting Random Register Access Test...", UVM_MEDIUM)
 
     // Perform random read/write sequence
     for (int i = 0; i < num_accesses; i++) begin
-      bit [7:0] addr = reg_addrs[$urandom_range(0, reg_addrs.size()-1)];
-      bit [31:0] wdata = $urandom();
-      bit [31:0] rdata;
 
       // Randomly choose read or write
-      bit is_write = $urandom_range(0, 1);
 
       if (is_write) begin
         apb_write(addr, wdata);
@@ -51,7 +54,6 @@ class test_rand_reg_access extends base_test;
     // Specific register tests
     // Test all TX_TL values (0, 4, 8, 15)
     begin
-      bit [31:0] val;
       int tl_vals[] = '{0, 4, 8, 15};
       foreach (tl_vals[i]) begin
         apb_write(8'h30, tl_vals[i]);  // TX_TL
@@ -62,7 +64,6 @@ class test_rand_reg_access extends base_test;
 
     // Test all RX_TL values (0, 4, 8, 15)
     begin
-      bit [31:0] val;
       int tl_vals[] = '{0, 4, 8, 15};
       foreach (tl_vals[i]) begin
         apb_write(8'h2C, tl_vals[i]);  // RX_TL
@@ -73,7 +74,6 @@ class test_rand_reg_access extends base_test;
 
     // Test SDA_HOLD values
     begin
-      bit [31:0] val;
       apb_write(8'h44, 16'h0001);
       apb_read(8'h44, val);
       apb_write(8'h44, 16'h00FF);

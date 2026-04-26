@@ -1,17 +1,25 @@
+import uvm_pkg::*;
+
 // I2C Slave BFM (Bus Functional Model)
 // Responds to I2C transactions as a slave device
 class i2c_slave_agent extends uvm_driver #(i2c_transfer);
 
   virtual i2c_if vif;
+  uvm_analysis_port #(i2c_transfer) ap;
+
+  // Timing parameters
+  real tperiod = 10us;
+  real t_high  = 4.7us;
+  real t_low   = 4.7us;
 
   // Configurable slave address (7-bit)
-  bit [6:0] slave_addr = 7'h3C;  // default, can be overridden
+  logic [6:0] slave_addr = 7'h3C;  // default, can be overridden
 
   // TX data buffer for slave transmit
-  bit [7:0] tx_data_queue[$];
+  logic [7:0] tx_data_queue[$];
 
   // Flags
-  bit addr_match = 0;
+  logic addr_match = 0;
 
   `uvm_component_utils(i2c_slave_agent)
 
@@ -23,6 +31,7 @@ class i2c_slave_agent extends uvm_driver #(i2c_transfer);
     super.build_phase(phase);
     if (!uvm_config_db #(virtual i2c_if)::get(this, "", "vif", vif))
       `uvm_fatal("NOVIF", "i2c_slave_agent: virtual interface not set")
+    ap = new("ap", this);
   endfunction
 
   // Drive ACK on SDA
@@ -57,19 +66,19 @@ class i2c_slave_agent extends uvm_driver #(i2c_transfer);
   endtask
 
   // Receive address byte
-  task receive_addr(output bit [6:0] addr, output bit rw);
-    bit [7:0] byte;
+  task receive_addr(output logic [6:0] addr, output logic rw);
+    logic [7:0] rcvd_byte;
     for (int i = 7; i >= 0; i--) begin
       @(negedge vif.scl_i);
-      byte[i] = vif.sda_i;
+      rcvd_byte[i] = vif.sda_i;
     end
-    addr = byte[7:1];
-    rw   = byte[0];
+    addr = rcvd_byte[7:1];
+    rw   = rcvd_byte[0];
     `uvm_info("I2C_SLAVE", $sformatf("RCVD ADDR 0x%02x R/W=%b", addr, rw), UVM_MEDIUM)
   endtask
 
   // Receive data byte
-  task receive_data(output bit [7:0] data);
+  task receive_data(output logic [7:0] data);
     for (int i = 7; i >= 0; i--) begin
       @(negedge vif.scl_i);
       data[i] = vif.sda_i;
@@ -91,10 +100,11 @@ class i2c_slave_agent extends uvm_driver #(i2c_transfer);
 
   // Main slave run task
   task run_phase(uvm_phase phase);
-    bit [6:0]  rcvd_addr;
-    bit         rw_bit;
-    bit [7:0]  data;
-    bit [7:0]   tx_byte;
+    logic ack;
+    reg [6:0]  rcvd_addr;
+    logic         rw_bit;
+    reg [7:0]  data;
+    reg [7:0]   tx_byte;
 
     forever begin
       // Wait for START condition
@@ -131,7 +141,7 @@ class i2c_slave_agent extends uvm_driver #(i2c_transfer);
             vif.sda_oe <= 1'b0;
             // Monitor ACK/NACK from master
             @(posedge vif.scl_i);
-            bit ack = vif.sda_i;
+            ack = vif.sda_i;
             `uvm_info("I2C_SLAVE", $sformatf("TX 0x%02x ACK=%b", tx_byte, ack), UVM_MEDIUM)
             @(negedge vif.scl_i);
           end else begin

@@ -9,18 +9,18 @@ class test_reg_enable_abort extends base_test;
   endfunction
 
   task run_phase(uvm_phase phase);
+    bit [31:0] en_val;
+    bit [31:0] en_stat;
     phase.raise_objection(this);
     `uvm_info("TEST_REG_ENABLE_ABORT", "Starting ENABLE/ABORT Register Test...", UVM_MEDIUM)
 
     // Read initial ENABLE status (should be 0 after reset)
-    bit [31:0] en_val;
     apb_read(8'h34, en_val);
     `uvm_info("TEST_REG_ENABLE_ABORT", $sformatf("ENABLE initial=0x%08h", en_val), UVM_MEDIUM)
     if (en_val[0] !== 1'b0)
       `uvm_error("TEST_REG_ENABLE_ABORT", "ENABLE should be 0 after reset")
 
     // Read ENABLE_STATUS (RO) to check IC_EN
-    bit [31:0] en_stat;
     apb_read(8'h4C, en_stat);
     `uvm_info("TEST_REG_ENABLE_ABORT", $sformatf("ENABLE_STATUS initial=0x%08h", en_stat), UVM_MEDIUM)
 

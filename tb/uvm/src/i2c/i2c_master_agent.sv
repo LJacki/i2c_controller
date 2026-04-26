@@ -1,8 +1,11 @@
+import uvm_pkg::*;
+
 // I2C Master BFM (Bus Functional Model)
 // Drives I2C bus as Master: START, address, data, ACK/NACK, STOP
 class i2c_master_agent extends uvm_driver #(i2c_transfer);
 
   virtual i2c_if vif;
+  uvm_analysis_port #(i2c_transfer) ap;
 
   // Timing parameters (default: 100kHz standard mode)
   real tperiod = 10us;   // SCL period
@@ -19,6 +22,7 @@ class i2c_master_agent extends uvm_driver #(i2c_transfer);
     super.build_phase(phase);
     if (!uvm_config_db #(virtual i2c_if)::get(this, "", "vif", vif))
       `uvm_fatal("NOVIF", "i2c_master_agent: virtual interface not set")
+    ap = new("ap", this);
   endfunction
 
   // Drive SCL high (allow slave to drive low for clock stretching)
@@ -35,7 +39,7 @@ class i2c_master_agent extends uvm_driver #(i2c_transfer);
   endtask
 
   // Drive SDA
-  task drive_sda(bit val);
+  task drive_sda(logic val);
     vif.sda_o  <= val;
     vif.sda_oe <= 1'b1;   // Drive SDA
   endtask
@@ -73,9 +77,10 @@ class i2c_master_agent extends uvm_driver #(i2c_transfer);
     `uvm_info("I2C_MASTER", "RESTART sent", UVM_MEDIUM)
   endtask
 
-  // Send 7-bit address + R/W bit
-  task send_addr(bit [6:0] addr, bit rw);
-    bit [7:0] addr_byte = {addr, rw};
+  // Send 7-logic address + R/W logic
+  task send_addr(logic [6:0] addr, logic rw);
+    logic ack;
+    logic [7:0] addr_byte = {addr, rw};
     for (int i = 7; i >= 0; i--) begin
       drive_sda(addr_byte[i]);
       drive_scl_high();
@@ -85,13 +90,14 @@ class i2c_master_agent extends uvm_driver #(i2c_transfer);
     release_sda();
     drive_scl_high();
     #100;  // Small delay for ACK sampling
-    bit ack = vif.sda_i;  // 0=ACK, 1=NACK
+    ack = vif.sda_i;  // 0=ACK, 1=NACK
     drive_scl_low();
     `uvm_info("I2C_MASTER", $sformatf("ADDR 0x%02x %s ACK=%b", addr, rw ? "READ" : "WRITE", ack), UVM_MEDIUM)
   endtask
 
-  // Send 8-bit data byte
-  task send_byte(bit [7:0] data);
+  // Send 8-logic data byte
+  task send_byte(logic [7:0] data);
+    logic ack;
     for (int i = 7; i >= 0; i--) begin
       drive_sda(data[i]);
       drive_scl_high();
@@ -101,13 +107,13 @@ class i2c_master_agent extends uvm_driver #(i2c_transfer);
     release_sda();
     drive_scl_high();
     #100;
-    bit ack = vif.sda_i;
+    ack = vif.sda_i;
     drive_scl_low();
     `uvm_info("I2C_MASTER", $sformatf("DATA 0x%02x ACK=%b", data, ack), UVM_MEDIUM)
   endtask
 
   // Receive byte and drive ACK/NACK
-  task receive_byte(output bit [7:0] data, bit ack);
+  task receive_byte(output logic [7:0] data, logic ack);
     data = 8'h0;
     release_sda();
     for (int i = 7; i >= 0; i--) begin
@@ -135,18 +141,14 @@ class i2c_master_agent extends uvm_driver #(i2c_transfer);
       // Send/recv data bytes
       foreach (tr.data[i]) begin
         if (tr.kind == i2c_transfer::I2C_WRITE) begin
-          bit ack;
           send_byte(tr.data[i]);
-          // ACK from slave (sampled, not driven by master)
         end else begin
-          bit ack_nack = (i == tr.data.size() - 1) ? 1'b1 : 1'b0; // NACK last byte
+          bit ack_nack = (i == tr.data.size() - 1) ? 1'b1 : 1'b0;
           receive_byte(tr.data[i], ack_nack);
         end
       end
 
-      // Send STOP if last_cmd=0 (write) or last_cmd=1 (read with NACK already sent)
       send_stop();
-
       seq_item_port.item_done();
     end
   endtask

@@ -21,6 +21,7 @@ class test_rand_interrupt_mask extends base_test;
   endfunction
 
   task run_phase(uvm_phase phase);
+    bit [31:0] mask_val;
     phase.raise_objection(this);
     `uvm_info("TEST_RAND_INTERRUPT_MASK", "Starting Random Interrupt Mask Test...", UVM_MEDIUM)
 
@@ -36,7 +37,6 @@ class test_rand_interrupt_mask extends base_test;
     apb_write(8'h20, {21'b1, rand_mask_pattern});  // Upper bits 1=masked
 
     // Read back
-    bit [31:0] mask_val;
     apb_read(8'h20, mask_val);
     `uvm_info("TEST_RAND_INTERRUPT_MASK", $sformatf("INTR_MASK written, read=0x%08h", mask_val), UVM_MEDIUM)
 

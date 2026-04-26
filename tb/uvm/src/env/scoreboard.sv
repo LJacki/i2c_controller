@@ -6,10 +6,10 @@ class scoreboard extends uvm_scoreboard;
   uvm_tlm_analysis_fifo #(i2c_transfer) i2c_fifo;
 
   // Expected data queue (from APB writes to DATA_CMD)
-  bit [7:0] expected_data_queue[$];
+  logic [7:0] expected_data_queue[$];
 
   // Received data queue (from I2C reads)
-  bit [7:0] received_data_queue[$];
+  logic [7:0] received_data_queue[$];
 
   // Match counter
   int mismatch_count = 0;
@@ -36,20 +36,20 @@ class scoreboard extends uvm_scoreboard;
 
   // Process APB transactions
   task process_apb_fifo();
+        reg [7:0] data_byte = tr.data[7:0];
+        logic       cmd_bit   = tr.data[8];  // CMD=0 write, CMD=1 read
+          reg [7:0] rcvd = received_data_queue.pop_front();
     apb_transfer tr;
     forever begin
       apb_fifo.get(tr);
       if (tr.kind == apb_transfer::APB_WRITE && tr.addr == 8'h0C) begin
         // DATA_CMD register write - extract data byte
-        bit [7:0] data_byte = tr.data[7:0];
-        bit       cmd_bit   = tr.data[8];  // CMD=0 write, CMD=1 read
         expected_data_queue.push_back(data_byte);
         `uvm_info("SCOREBOARD", $sformatf("APB WRITE DATA_CMD=0x%02x CMD=%b queue_size=%0d", data_byte, cmd_bit, expected_data_queue.size()), UVM_MEDIUM)
       end
       if (tr.kind == apb_transfer::APB_READ && tr.addr == 8'h0C) begin
         // DATA_CMD register read - compare with received data
         if (received_data_queue.size() > 0) begin
-          bit [7:0] rcvd = received_data_queue.pop_front();
           `uvm_info("SCOREBOARD", $sformatf("APB READ DATA_CMD=0x%02x vs RX_FIFO=0x%02x", tr.data[7:0], rcvd), UVM_MEDIUM)
           if (rcvd !== tr.data[7:0]) begin
             `uvm_error("DATA_MISMATCH", $sformatf("MISMATCH: expected=0x%02x actual=0x%02x", rcvd, tr.data[7:0]))
@@ -64,13 +64,13 @@ class scoreboard extends uvm_scoreboard;
 
   // Process I2C transactions
   task process_i2c_fifo();
+            reg [7:0] exp = expected_data_queue.pop_front();
     i2c_transfer tr;
     forever begin
       i2c_fifo.get(tr);
       if (tr.kind == i2c_transfer::I2C_WRITE && tr.data.size() > 0) begin
         foreach (tr.data[i]) begin
           if (expected_data_queue.size() > 0) begin
-            bit [7:0] exp = expected_data_queue.pop_front();
             if (exp !== tr.data[i]) begin
               `uvm_error("I2C_MISMATCH", $sformatf("I2C_WRITE: expected=0x%02x actual=0x%02x", exp, tr.data[i]))
               mismatch_count++;

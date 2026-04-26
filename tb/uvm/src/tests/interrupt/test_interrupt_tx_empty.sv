@@ -9,6 +9,9 @@ class test_interrupt_tx_empty extends base_test;
   endfunction
 
   task run_phase(uvm_phase phase);
+    bit [31:0] raw_intr;
+    bit [31:0] txflr;
+    bit [31:0] intr_stat;
     phase.raise_objection(this);
     `uvm_info("TEST_INTERRUPT_TX_EMPTY", "Starting TX_EMPTY Interrupt Test...", UVM_MEDIUM)
 
@@ -32,17 +35,14 @@ class test_interrupt_tx_empty extends base_test;
     #100us;
 
     // Check RAW_INTR_STAT bit 1 (R_TX_EMPTY)
-    bit [31:0] raw_intr;
     apb_read(8'h28, raw_intr);
     `uvm_info("TEST_INTERRUPT_TX_EMPTY", $sformatf("RAW_INTR_STAT=0x%08h", raw_intr), UVM_MEDIUM)
 
     // Check TXFLR (should be 0 if empty)
-    bit [31:0] txflr;
     apb_read(8'h3C, txflr);
     `uvm_info("TEST_INTERRUPT_TX_EMPTY", $sformatf("TXFLR=0x%08h", txflr), UVM_MEDIUM)
 
     // Check INTR_STAT bit 1 (I_TX_EMPTY, post-mask)
-    bit [31:0] intr_stat;
     apb_read(8'h24, intr_stat);
     `uvm_info("TEST_INTERRUPT_TX_EMPTY", $sformatf("INTR_STAT=0x%08h", intr_stat), UVM_MEDIUM)
 

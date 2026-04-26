@@ -20,7 +20,7 @@ Warning-[LINX_KRNL] Unsupported Linux kernel
 /eda/synopsys/vcs/O-2018.09-SP2/vcs/O-2018.09-SP2/linux64/bin/vcs1: /home/xiaoai/lib64_compat/libpthread.so.0: no version information available (required by /eda/synopsys/vcs/O-2018.09-SP2/vcs/O-2018.09-SP2/linux64/bin/../lib/libvfs.so)
 /eda/synopsys/vcs/O-2018.09-SP2/vcs/O-2018.09-SP2/linux64/bin/vcs1: /home/xiaoai/lib64_compat/libpthread.so.0: no version information available (required by /eda/synopsys/vcs/O-2018.09-SP2/vcs/O-2018.09-SP2/linux64/bin/../lib/libsqlite3.so.0)
                          Chronologic VCS (TM)
-       Version O-2018.09-SP2_Full64 -- Sun Apr 26 23:45:20 2026
+       Version O-2018.09-SP2_Full64 -- Mon Apr 27 00:27:00 2026
                Copyright (c) 1991-2018 by Synopsys Inc.
                          ALL RIGHTS RESERVED
 
@@ -304,28 +304,60 @@ Parsing design file 'rtl/tx_dat_fifo.sv'
 Parsing design file 'rtl/rx_fifo.sv'
 Parsing design file 'rtl/apb_reg_file.sv'
 Parsing design file 'rtl/i2c_master_fsm.sv'
+Parsing design file 'rtl/i2c_slave_fsm.sv'
+Parsing design file 'rtl/i2c_io_buf.sv'
+Parsing design file 'rtl/i2c_ctrl_top.sv'
+Parsing design file 'tb/uvm/src/apb/apb_if.sv'
+Parsing design file 'tb/uvm/src/i2c/i2c_if.sv'
+Parsing design file 'tb/uvm/src/uvm_macros.svh'
+Parsing design file 'tb/uvm/src/i2c_ctrl_pkg.sv'
+Parsing included file '/eda/synopsys/vcs/O-2018.09-SP2/vcs/O-2018.09-SP2/etc/uvm/uvm_macros.svh'.
+Back to file 'tb/uvm/src/i2c_ctrl_pkg.sv'.
+Parsing included file 'tb/uvm/src/apb/apb_transfer.sv'.
+Back to file 'tb/uvm/src/i2c_ctrl_pkg.sv'.
+Parsing included file 'tb/uvm/src/apb/apb_driver.sv'.
+Back to file 'tb/uvm/src/i2c_ctrl_pkg.sv'.
+Parsing included file 'tb/uvm/src/apb/apb_monitor.sv'.
+Back to file 'tb/uvm/src/i2c_ctrl_pkg.sv'.
+Parsing included file 'tb/uvm/src/i2c/i2c_transfer.sv'.
+Back to file 'tb/uvm/src/i2c_ctrl_pkg.sv'.
+Parsing included file 'tb/uvm/src/i2c/i2c_master_agent.sv'.
+
+Note-[SV-LCM-PPWI] Package previously wildcard imported
+tb/uvm/src/i2c/i2c_master_agent.sv, 1
+i2c_ctrl_pkg
+  Package 'uvm_pkg' already wildcard imported. 
+  Ignoring uvm_pkg::*
+  See the SystemVerilog LRM(1800-2005), section 19.2.1.
+
+Back to file 'tb/uvm/src/i2c_ctrl_pkg.sv'.
+Parsing included file 'tb/uvm/src/i2c/i2c_slave_agent.sv'.
+
+Note-[SV-LCM-PPWI] Package previously wildcard imported
+tb/uvm/src/i2c/i2c_slave_agent.sv, 1
+i2c_ctrl_pkg
+  Package 'uvm_pkg' already wildcard imported. 
+  Ignoring uvm_pkg::*
+  See the SystemVerilog LRM(1800-2005), section 19.2.1.
+
+Back to file 'tb/uvm/src/i2c_ctrl_pkg.sv'.
+Parsing included file 'tb/uvm/src/env/scoreboard.sv'.
+Back to file 'tb/uvm/src/i2c_ctrl_pkg.sv'.
+Parsing included file 'tb/uvm/src/env/i2c_ctrl_env.sv'.
+Back to file 'tb/uvm/src/i2c_ctrl_pkg.sv'.
+Parsing included file 'tb/uvm/src/tests/test_cfg.sv'.
+Back to file 'tb/uvm/src/i2c_ctrl_pkg.sv'.
+Parsing included file 'tb/uvm/src/tests/base_test.sv'.
+Back to file 'tb/uvm/src/i2c_ctrl_pkg.sv'.
+Parsing included file 'tb/uvm/src/tests/basic/test_basic_master_single_write.sv'.
 
 Error-[SE] Syntax error
   Following verilog source has syntax error :
-  "rtl/i2c_master_fsm.sv", 554: token is '''
-      assign start_det = (state == ST_START) && in_high_phase && (scl_cnt == 
-  '0');
-                                                                              
-  ^
+  "tb/uvm/src/tests/basic/test_basic_master_single_write.sv", 31: token is 
+  'bit'
+      bit [31:0] status;
+         ^
+  SystemVerilog  keyword 'bit' is not expected to be used in this context.
 
 1 error
-/bin/mv: cannot stat '/tmp/vcs_20260426154520_159755/ctstats/link_*': No such file or directory
-
-Compilation Performance Summary
-===============================
-VCS started at        :  Sun Apr 26 23:45:20 2026
-Elapsed time          :  1 sec
-CPU Time              :  0.6 sec
-Virtual memory size   :  223.0 MB
-Resident set size     :  74.2 MB
-Shared memory size    :  2.6 MB
-Private memory size   :  71.6 MB
-Major page faults     :  0
-Machine name          :  IcDesign
-===============================
-
+CPU time: .517 seconds to compile

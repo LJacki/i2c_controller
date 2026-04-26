@@ -27,6 +27,8 @@ class test_rand_master_write extends base_test;
   endfunction
 
   task run_phase(uvm_phase phase);
+    logic [31:0] status;
+  begin
     phase.raise_objection(this);
     `uvm_info("TEST_RAND_MASTER_WRITE", "Starting Random Master Write Test...", UVM_MEDIUM)
 
@@ -61,7 +63,6 @@ class test_rand_master_write extends base_test;
     #100us;
 
     // Check STATUS
-    bit [31:0] status;
     apb_read(8'h38, status);
     `uvm_info("TEST_RAND_MASTER_WRITE", $sformatf("STATUS=0x%08h", status), UVM_MEDIUM)
 

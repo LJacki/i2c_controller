@@ -9,6 +9,8 @@ class test_interrupt_rx_full extends base_test;
   endfunction
 
   task run_phase(uvm_phase phase);
+    bit [31:0] raw_intr;
+    bit [31:0] intr_stat;
     phase.raise_objection(this);
     `uvm_info("TEST_INTERRUPT_RX_FULL", "Starting RX_FULL Interrupt Test...", UVM_MEDIUM)
 
@@ -35,12 +37,10 @@ class test_interrupt_rx_full extends base_test;
     #50us;
 
     // Check RAW_INTR_STAT bit 0 (R_RX_FULL)
-    bit [31:0] raw_intr;
     apb_read(8'h28, raw_intr);
     `uvm_info("TEST_INTERRUPT_RX_FULL", $sformatf("RAW_INTR_STAT=0x%08h", raw_intr), UVM_MEDIUM)
 
     // Check INTR_STAT bit 0 (I_RX_FULL, post-mask)
-    bit [31:0] intr_stat;
     apb_read(8'h24, intr_stat);
     `uvm_info("TEST_INTERRUPT_RX_FULL", $sformatf("INTR_STAT=0x%08h", intr_stat), UVM_MEDIUM)
 

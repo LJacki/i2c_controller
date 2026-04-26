@@ -5,9 +5,9 @@ class i2c_transfer extends uvm_sequence_item;
   typedef enum { START, STOP, RESTART, ADDR, DATA, ACK, NACK } bit_type_e;
 
   rand i2c_kind_e kind;
-  rand bit [6:0] addr;       // 7-bit target address
-  rand bit [7:0] data[];     // dynamic array of data bytes
-  rand bit        last_cmd;   // last command: 0=write, 1=read
+  rand logic [6:0] addr;       // 7-logic target address
+  rand logic [7:0] data[];     // dynamic array of data bytes
+  rand logic        last_cmd;   // last command: 0=write, 1=read
 
   `uvm_object_utils_begin(i2c_transfer)
     `uvm_field_enum(i2c_kind_e, kind, UVM_DEFAULT)

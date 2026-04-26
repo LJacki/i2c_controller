@@ -10,6 +10,8 @@ class test_basic_slave_addr_no_match extends base_test;
   endfunction
 
   task run_phase(uvm_phase phase);
+    bit [31:0] rxflr_before;
+    bit [31:0] rxflr_after;
     phase.raise_objection(this);
     `uvm_info("TEST_BASIC_SLAVE_ADDR_NO_MATCH", "Starting Slave Address No Match Test...", UVM_MEDIUM)
 
@@ -19,7 +21,6 @@ class test_basic_slave_addr_no_match extends base_test;
     apb_write(8'h34, 32'h1);   // ENABLE=1
 
     // Check initial RXFLR (should be 0)
-    bit [31:0] rxflr_before;
     apb_read(8'h40, rxflr_before);
     `uvm_info("TEST_BASIC_SLAVE_ADDR_NO_MATCH", $sformatf("RXFLR before transaction=0x%08h", rxflr_before), UVM_MEDIUM)
 
@@ -39,7 +40,6 @@ class test_basic_slave_addr_no_match extends base_test;
     #50us;
 
     // Check RXFLR after wrong-address transaction (should still be 0)
-    bit [31:0] rxflr_after;
     apb_read(8'h40, rxflr_after);
     `uvm_info("TEST_BASIC_SLAVE_ADDR_NO_MATCH", $sformatf("RXFLR after wrong-addr=0x%08h", rxflr_after), UVM_MEDIUM)
 

@@ -9,6 +9,9 @@ class test_interrupt_stop_det extends base_test;
   endfunction
 
   task run_phase(uvm_phase phase);
+    bit [31:0] raw_intr;
+    bit [31:0] intr_stat;
+    bit [31:0] raw_intr2;
     phase.raise_objection(this);
     `uvm_info("TEST_INTERRUPT_STOP_DET", "Starting STOP_DET Interrupt Test...", UVM_MEDIUM)
 
@@ -30,12 +33,10 @@ class test_interrupt_stop_det extends base_test;
     #50us;
 
     // Check RAW_INTR_STAT bit 8 (R_STP_DET)
-    bit [31:0] raw_intr;
     apb_read(8'h28, raw_intr);
     `uvm_info("TEST_INTERRUPT_STOP_DET", $sformatf("RAW_INTR_STAT=0x%08h (bit8=STP_DET)", raw_intr), UVM_MEDIUM)
 
     // Check INTR_STAT bit 8 (I_STP_DET, post-mask)
-    bit [31:0] intr_stat;
     apb_read(8'h24, intr_stat);
     `uvm_info("TEST_INTERRUPT_STOP_DET", $sformatf("INTR_STAT=0x%08h", intr_stat), UVM_MEDIUM)
 
@@ -60,7 +61,6 @@ class test_interrupt_stop_det extends base_test;
     #50us;
 
     // Check STOP_DET again after slave transaction
-    bit [31:0] raw_intr2;
     apb_read(8'h28, raw_intr2);
     `uvm_info("TEST_INTERRUPT_STOP_DET", $sformatf("RAW_INTR_STAT after slave STOP=0x%08h", raw_intr2), UVM_MEDIUM)
 

@@ -9,6 +9,8 @@ class test_reg_tar_sar extends base_test;
   endfunction
 
   task run_phase(uvm_phase phase);
+    bit [31:0] tar_val;
+    bit [31:0] sar_val;
     phase.raise_objection(this);
     `uvm_info("TEST_REG_TAR_SAR", "Starting TAR/SAR Register Test...", UVM_MEDIUM)
 
@@ -17,7 +19,6 @@ class test_reg_tar_sar extends base_test;
 
     // Test TAR with normal address
     apb_write(8'h04, {22'b0, 1'b0, 1'b0, 7'h3C});  // TAR=0x3C
-    bit [31:0] tar_val;
     apb_read(8'h04, tar_val);
     `uvm_info("TEST_REG_TAR_SAR", $sformatf("TAR=0x3C: read=0x%08h", tar_val), UVM_MEDIUM)
     if (tar_val[6:0] !== 7'h3C)
@@ -42,7 +43,6 @@ class test_reg_tar_sar extends base_test;
 
     // Test SAR with normal address
     apb_write(8'h08, {25'b0, 7'h3C});  // SAR=0x3C
-    bit [31:0] sar_val;
     apb_read(8'h08, sar_val);
     `uvm_info("TEST_REG_TAR_SAR", $sformatf("SAR=0x3C: read=0x%08h", sar_val), UVM_MEDIUM)
     if (sar_val[6:0] !== 7'h3C)

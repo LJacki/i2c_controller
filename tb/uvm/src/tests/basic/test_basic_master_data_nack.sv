@@ -10,6 +10,7 @@ class test_basic_master_data_nack extends base_test;
   endfunction
 
   task run_phase(uvm_phase phase);
+    bit [31:0] txabrt;
     phase.raise_objection(this);
     `uvm_info("TEST_BASIC_MASTER_DATA_NACK", "Starting Master Data NACK Test...", UVM_MEDIUM)
 
@@ -30,7 +31,6 @@ class test_basic_master_data_nack extends base_test;
     #50us;
 
     // Check TX_ABRT_SOURCE for ABRT_TXDATA_NOACK (bit 3)
-    bit [31:0] txabrt;
     apb_read(8'h48, txabrt);
     `uvm_info("TEST_BASIC_MASTER_DATA_NACK", $sformatf("TX_ABRT_SOURCE=0x%08h", txabrt), UVM_MEDIUM)
 

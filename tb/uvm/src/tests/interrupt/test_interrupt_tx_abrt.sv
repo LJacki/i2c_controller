@@ -9,6 +9,9 @@ class test_interrupt_tx_abrt extends base_test;
   endfunction
 
   task run_phase(uvm_phase phase);
+    bit [31:0] raw_intr;
+    bit [31:0] txabrt;
+    bit [31:0] txabrt_clear;
     phase.raise_objection(this);
     `uvm_info("TEST_INTERRUPT_TX_ABRT", "Starting TX_ABRT Interrupt Test...", UVM_MEDIUM)
 
@@ -28,12 +31,10 @@ class test_interrupt_tx_abrt extends base_test;
     #50us;
 
     // Check RAW_INTR_STAT bit 2 (R_TX_ABRT)
-    bit [31:0] raw_intr;
     apb_read(8'h28, raw_intr);
     `uvm_info("TEST_INTERRUPT_TX_ABRT", $sformatf("RAW_INTR_STAT=0x%08h (bit2=TX_ABRT)", raw_intr), UVM_MEDIUM)
 
     // Read TX_ABRT_SOURCE to check abort source bits
-    bit [31:0] txabrt;
     apb_read(8'h48, txabrt);
     `uvm_info("TEST_INTERRUPT_TX_ABRT", $sformatf("TX_ABRT_SOURCE=0x%08h", txabrt), UVM_MEDIUM)
 
@@ -44,7 +45,6 @@ class test_interrupt_tx_abrt extends base_test;
     if (txabrt[15]) `uvm_info("TEST_INTERRUPT_TX_ABRT", "ABRT_SLVRD_INTXFR (bit15) is SET", UVM_MEDIUM)
 
     // Clear TX_ABRT by reading TX_ABRT_SOURCE (clr-on-read behavior)
-    bit [31:0] txabrt_clear;
     apb_read(8'h48, txabrt_clear);
     `uvm_info("TEST_INTERRUPT_TX_ABRT", $sformatf("TX_ABRT cleared (read back)=0x%08h", txabrt_clear), UVM_MEDIUM)
 

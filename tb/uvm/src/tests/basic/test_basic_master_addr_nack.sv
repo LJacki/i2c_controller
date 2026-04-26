@@ -10,6 +10,8 @@ class test_basic_master_addr_nack extends base_test;
   endfunction
 
   task run_phase(uvm_phase phase);
+    bit [31:0] txabrt;
+    bit [31:0] raw_intr;
     phase.raise_objection(this);
     `uvm_info("TEST_BASIC_MASTER_ADDR_NACK", "Starting Master Address NACK Test...", UVM_MEDIUM)
 
@@ -26,12 +28,10 @@ class test_basic_master_addr_nack extends base_test;
     #50us;
 
     // Check TX_ABRT_SOURCE for ABRT_7B_NOACK (bit 0)
-    bit [31:0] txabrt;
     apb_read(8'h48, txabrt);
     `uvm_info("TEST_BASIC_MASTER_ADDR_NACK", $sformatf("TX_ABRT_SOURCE=0x%08h", txabrt), UVM_MEDIUM)
 
     // Check RAW_INTR_STAT for TX_ABRT (bit 2)
-    bit [31:0] raw_intr;
     apb_read(8'h28, raw_intr);
     `uvm_info("TEST_BASIC_MASTER_ADDR_NACK", $sformatf("RAW_INTR_STAT=0x%08h", raw_intr), UVM_MEDIUM)
 

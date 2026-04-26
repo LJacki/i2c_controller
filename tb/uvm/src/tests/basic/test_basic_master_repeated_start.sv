@@ -10,6 +10,7 @@ class test_basic_master_repeated_start extends base_test;
   endfunction
 
   task run_phase(uvm_phase phase);
+    bit [31:0] rxflr;
     phase.raise_objection(this);
     `uvm_info("TEST_BASIC_MASTER_REPEATED_START", "Starting Master Repeated START Test...", UVM_MEDIUM)
 
@@ -30,7 +31,6 @@ class test_basic_master_repeated_start extends base_test;
     #100us;
 
     // Check STATUS for RX FIFO
-    bit [31:0] rxflr;
     apb_read(8'h40, rxflr);
     `uvm_info("TEST_BASIC_MASTER_REPEATED_START", $sformatf("RXFLR=0x%08h", rxflr), UVM_MEDIUM)
 

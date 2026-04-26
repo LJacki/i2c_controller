@@ -9,13 +9,14 @@ class test_reg_undefined_addr extends base_test;
   endfunction
 
   task run_phase(uvm_phase phase);
+    int error_count = 0;
+    bit [31:0] val;
+    bit [7:0] test_addrs[] = '{8'h50, 8'h60, 8'h70, 8'h80, 8'h90, 8'hA0, 8'hB0, 8'hC0, 8'hD0, 8'hE0, 8'hF0, 8'hFF};
     phase.raise_objection(this);
     `uvm_info("TEST_REG_UNDEFINED_ADDR", "Starting Undefined Address Test...", UVM_MEDIUM)
 
-    int error_count = 0;
 
     // === Test defined addresses return non-zero (or specific values) ===
-    bit [31:0] val;
 
     // Write to a defined register, then read it back
     apb_write(8'h00, 12'h55);  // CON
@@ -28,7 +29,6 @@ class test_reg_undefined_addr extends base_test;
 
     // === Test undefined addresses ===
     // Undefined range: 0x50 to 0xFF
-    bit [7:0] test_addrs[] = '{8'h50, 8'h60, 8'h70, 8'h80, 8'h90, 8'hA0, 8'hB0, 8'hC0, 8'hD0, 8'hE0, 8'hF0, 8'hFF};
 
     foreach (test_addrs[i]) begin
       apb_read(test_addrs[i], val);
