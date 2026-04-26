@@ -1,11 +1,13 @@
-# I2C Controller 设计规格书 v2.0
+# I2C Controller 设计规格书 v2.1
 
 **文件路径:** `i2c_controller/docs/SPEC.md`
-**版本:** v2.0
+**版本:** v2.1
 **日期:** 2026-04-26
 **作者:** Jack & 小蜂
 **架构参考:** DesignWare DW_apb_i2c
 **协议参考:** NXP UM10204 I2C-bus specification and user manual (Rev.7, 2021)
+
+> **v2.1 主要更新（2026-04-26）：** 修正 Master transaction 触发机制、NACK 驱动行为、TX FIFO 双 FIFO 结构、Section 2.4 ACK/NACK 方向错误。
 **UM10204 下载:** https://www.nxp.com/docs/en/user-guide/UM10204.pdf
 
 ---
@@ -137,12 +139,16 @@
 
 ### 2.4 ACK/NACK 行为
 
-| 场景 | 发送方 | 接收方动作 |
-|------|--------|-----------|
-| 地址匹配 | Master | Slave 拉低 SDA |
-| 地址不匹配 | Master | Slave 保持高阻，Master 自己可拉低（NACK） |
-| 数据接收 OK | Master | Slave 拉低 SDA |
-| 数据接收异常 | Master | Slave 保持高阻 |
+| 场景 | SDA 驱动方 | 动作 |
+|------|-----------|------|
+| 地址匹配，Slave 响应 | **Slave** | SCL=0 期间 Slave 拉低 SDA |
+| 地址不匹配，Slave 不响应 | **Slave** | 保持高阻（不驱动 SDA） |
+| 数据字节接收正常（Master→Slave） | **Slave** | SCL=0 期间 Slave 拉低 SDA |
+| 数据字节接收正常（Slave→Master） | **Master** | SCL=0 期间 Master 拉低 SDA |
+| NACK（Master 读最后字节） | **Master** | SCL=0 期间 Master 驱动 SDA=1（不拉低） |
+| NACK（Slave 收到无效数据） | **Slave** | 保持高阻 |
+
+> **NACK 的本质：** NACK 不是"没有 ACK"，而是接收方**主动驱动 SDA=1**（高电平）表示"我不想再接收了"。I2C 总线上没有"被动高电平"——SDA 被上拉电阻拉高，但上拉本身不等于 NACK。
 
 ---
 
@@ -322,16 +328,36 @@ SPEED 编码:
 
 | Bit | 名称 | 访问 | 默认 | 描述 |
 |-----|------|------|------|------|
-| [7:0] | DAT | W/RW | 8'h00 | **写：** 待发送数据（Master 发射/ Slave 发射）<br>**读：** 接收数据（Master 接收/ Slave 接收）|
-| 8 | CMD | WO | 1'b0 | **Master 读时必须写 1**，写事务时写 0。<br>Slave 模式下写 0 表示发送数据 |
-| 9 | STRETCH_CLOCK | WO | 1'b0 | 1=Stretch 时钟直到 TX FIFO 空（Slave 发射时） |
-| [31:10] | Reserved | RO | 0 | 保留 |
+| [7:0] | DAT | W/RW | 8'h00 | **写：** 待发送数据字节（写入 TX DAT FIFO）<br>**读：** 从 RX FIFO 读取接收数据 |
+| 8 | CMD | WO | 1'b0 | **命令位**，写入 TX CMD FIFO：<br>`CMD=0`：写事务（Master 发射数据 / Slave 发射数据）<br>`CMD=1`：读事务（Master 接收数据）<br>Slave 模式下 CMD=0 表示准备发送 |
+| [31:9] | Reserved | RO | 0 | 保留 |
 
-**写行为（Master 发射）：** 写 DAT 即触发一次 I2C 写事务（START → 地址 → DAT → STOP）
+**写 DATA_CMD 的行为（DW_apb_i2c 真实行为）：**
 
-**写行为（Master 接收）：** 写 DAT=任意值 + CMD=1，触发一次 I2C 读事务（START → 地址 → 读 → STOP）
+写 DATA_CMD 寄存器时，DAT 和 CMD 分别进入两个独立的 FIFO：
+```
+写入 DATA_CMD{DAT=val, CMD=bit} 时：
+  → TX CMD FIFO push CMD bit
+  → TX DAT FIFO push DAT byte
+```
 
-**读行为（任意模式）：** 读 DAT 返回 RX FIFO 中的最新数据
+**TX CMD FIFO 和 TX DAT FIFO 是两条独立的 FIFO**，FIFO 深度均为 16。Master FSM 从两个 FIFO 中**按写入顺序配对消费**：
+
+| TX CMD FIFO | TX DAT FIFO | Master FSM 动作 |
+|-------------|-------------|----------------|
+| CMD=0（写） | DAT=0xAA | 发起写事务：START→ADDR+W→[0xAA]→STOP |
+| CMD=0, CMD=0, CMD=0 | DAT=0x11, 0x22, 0x33 | 连续写 3 字节，自动 STOP |
+| CMD=0, CMD=1 | DAT=reg_addr, 0x00 | 写寄存器地址后自动 Repeated START + 读 |
+| CMD=1, CMD=1 | DAT=x, x | 连续读 2 字节，最后字节 NACK |
+
+**消费规则：**
+- Master 每完成一个字节的发送，从 TX CMD FIFO 弹出一个 CMD，从 TX DAT FIFO 弹出一个 DAT
+- TX CMD FIFO 为空时，Master 停止，发送 STOP（或等待新命令）
+- 最后 CMD=0 之后自动 STOP；CMD=1 之后自动 STOP（最后字节由 Master 发 NACK）
+
+**读 DATA_CMD 的行为：** 读取 RX FIFO 中的数据（按 FIFO 顺序，先入先出）
+
+**注意：** CMD 和 DAT 必须**成对写入**（每次写寄存器同时填充两个 FIFO），否则 CMD/DAT 配对错乱。
 
 ---
 
@@ -522,31 +548,27 @@ SPEED 编码:
 ### 4.1 整体架构
 
 ```
-┌──────────────────────────────────────────────────────────────────────┐
-│                        I2C Controller 顶层                            │
-│                                                                      │
-│  APB Interface              Protocol Engine              I/O Buffer  │
-│  ┌──────────┐              ┌────────────────┐          ┌───────────┐  │
-│  │          │              │                │          │           │  │
-│  │  Register│◄────────────►│   FSM Core     │◄────────►│ SCL Gen   │  │
-│  │   File   │              │  (Master +     │          │ (Master)  │  │
-│  │          │              │   Slave)        │          │           │  │
-│  │  + FIFO  │              │                │          └─────┬─────┘  │
-│  │          │              │                │                │        │
-│  │          │              └────────────────┘          SCL ──┤        │
-│  └────┬─────┘                                             │        │
-│       │                                                   │        │
-│       │ APB                                                     │
-│  prdata[31:0]  pwdata[31:0]                            ┌─────┴─────┐  │
-│  paddr[7:0]    pwrite                                 │           │  │
-│  psel,penable presetn                                 │  SDA I/O  │  │
-│                                                     ┌──►           │  │
-│                                                     │  └─────┬─────┘  │
-│                                                     │        │        │
-└─────────────────────────────────────────────────────┼────────┼────────┘
-                                                      │        │
-                                              sda_i ◄─┘    sda_o,sda_oe
-                                              scl_i ◄─┘    scl_o,scl_oe
+┌──────────────────────────────────────────────────────────────────────────┐
+│                          I2C Controller 顶层                              │
+│                                                                          │
+│  APB Interface              Protocol Engine                   I/O Buffer  │
+│  ┌──────────┐              ┌────────────────────┐         ┌───────────┐ │
+│  │  Register│◄────────────►│                    │◄────────►│ SCL Gen   │ │
+│  │   File   │              │    Master FSM      │         │(Master)   │ │
+│  │          │              │    (TX CMD/DAT     │         └─────┬─────┘ │
+│  ├──────────┤              │     FIFO Consumer)  │                 │       │
+│  │TX CMD FIFO│             │                    │             SCL ──┤       │
+│  │ (16×1b) │              │    Slave FSM       │                 │       │
+│  │TX DAT FIFO│             │   (addr match,      │         ┌─────┴─────┐ │
+│  │ (16×8b) │              │    rx/tx)           │         │  SDA I/O  │ │
+│  │RX DAT FIFO│             │                    │◄────────►│           │ │
+│  │ (16×8b) │              └────────────────────┘         └───────────┘ │
+│  └────┬─────┘                                                         │
+│       │ APB                                                              │
+│  prdata[31:0]  pwdata[31:0]                    sda_i ◄────────────────┘
+│  paddr[7:0]    pwrite                         scl_i ◄────────────────┘
+│  psel,penable  presetn                            intr
+└─────────────────────────────────────────────────────────────────────────┘
 ```
 
 ### 4.2 子模块功能划分
@@ -554,9 +576,10 @@ SPEED 编码:
 | 子模块 | 职责 |
 |--------|------|
 | **APB Interface** | 寄存器读写译码、FIFO 读/写访问、中断状态管理 |
-| **TX FIFO** | 缓存待发送数据，深度 16，提供 full/empty/level 状态 |
+| **TX CMD FIFO** | 缓存命令位（1-bit/entry，深度 16），决定读/写事务类型 |
+| **TX DAT FIFO** | 缓存数据字节（8-bit/entry，深度 16），配合 CMD FIFO 配对消费 |
 | **RX FIFO** | 缓存已接收数据，深度 16，提供 full/empty/level 状态 |
-| **Master FSM** | 生成 I2C 总线时序（START/ADDR/DATA/ACK/STOP）、仲裁、时钟生成 |
+| **Master FSM** | 从 TX CMD/DAT FIFO 消费命令，生成 I2C 总线时序（START/ADDR/DATA/ACK/STOP）、仲裁、时钟生成 |
 | **Slave FSM** | 地址匹配、接收/发送数据、时钟拉伸响应 |
 | **Clock Generator** | 基于 HCNT/LCNT 产生 SCL 时钟（Master 模式） |
 | **SDA/SCL I/O Buffer** | 双向 I/O，OE 控制三态，支持上拉电阻（外置） |
@@ -568,13 +591,19 @@ CPU 操作顺序：
 1. 配置 I2C_TAR = 目标地址（7-bit，bit[6:0]）
 2. 配置 I2C_CON.MASTER_MODE = 1, SPEED, RESTART_EN
 3. 配置 I2C_ENABLE.EN = 1
-4. 写 I2C_DATA_CMD.DAT = 待发送数据（CMD=0）
-5. 轮询 I2C_STATUS.TFE 或等待 TX_EMPTY 中断
-6. 传输完成后（TX_ABRT 无异常）读 TX_ABRT_SOURCE 确认无错误
+4. 写 I2C_DATA_CMD{DAT=0xAA, CMD=0}（同时填充 TX CMD FIFO 和 TX DAT FIFO）
+5. Master FSM 检测到 TX CMD/DAT FIFO 非空，自动发起事务
+6. 轮询 I2C_STATUS.TFE（TX FIFO 空）或等待 TX_EMPTY 中断
+7. 读 TX_ABRT_SOURCE 确认无异常
 
 I2C 总线结果：
-  S  [ADDR+W] A [DATA] A  P
+  S  [ADDR+W] A [0xAA] A  P
   └─START─┘└─地址+写─┘└─数┘└─ACK┘└─STOP─┘
+
+TX FIFO 消费过程：
+  写入：TX_CMD=0, TX_DAT=0xAA → FIFO 非空
+  Master 消费：START→ADDR+W→[0xAA]→STOP
+  FIFO 空：TFE=1
 ```
 
 ### 4.4 Master 连续写事务（多字节）
@@ -583,12 +612,18 @@ I2C 总线结果：
 CPU 操作顺序：
 1. 配置 I2C_TAR = 目标地址
 2. 配置 I2C_ENABLE.EN = 1
-3. 连续写入 I2C_DATA_CMD（最多填满 TX FIFO=16字节）
-4. Controller 自动连续发送，直到 TX FIFO 空
-5. 轮询 I2C_RAW_INTR_STAT.R_TX_EMPTY 或 R_TX_ABRT
+3. 连续写入 I2C_DATA_CMD{DAT=val, CMD=0}（3次，填满 TX FIFO）
+   写入顺序：{DAT=0x11, CMD=0} → {DAT=0x22, CMD=0} → {DAT=0x33, CMD=0}
+4. Master FSM 自动连续消费 TX FIFO：
+   - 每消费一对 CMD/DAT，发送一个字节
+   - 最后 CMD=0 消费完毕后，自动发送 STOP
+5. 轮询 TX_EMPTY 或 TX_ABRT
 
 I2C 总线结果（3字节示例）：
-  S [ADDR+W] A [DATA0] A [DATA1] A [DATA2] A  P
+  S [ADDR+W] A [0x11] A [0x22] A [0x33] A  P
+
+关键：CMD 决定"这是数据还是读命令"，Master 按 FIFO 顺序连续发送，
+      最后一个写命令后自动 STOP（不需软件干预）
 ```
 
 ### 4.5 Master 读事务（单字节）
@@ -597,14 +632,20 @@ I2C 总线结果（3字节示例）：
 CPU 操作顺序：
 1. 配置 I2C_TAR = 目标地址
 2. 配置 I2C_ENABLE.EN = 1
-3. 写 I2C_DATA_CMD = {8'h00, CMD=1}（触发读）
-4. 轮询 I2C_RAW_INTR_STAT.R_RX_FULL 或等待 RX_FULL 中断
-5. 读 I2C_DATA_CMD 获取 RX FIFO 中的数据
+3. 写 I2C_DATA_CMD{DAT=0x00, CMD=1}（CMD=1 表示读）
+4. Master FSM 检测到 CMD=1，自动发起读事务
+5. 轮询 RX_FULL 中断或读 I2C_STATUS.RFNE
+6. 读 I2C_DATA_CMD 获取 RX FIFO 中的数据
 
 I2C 总线结果：
-  S [ADDR+R] A [DATA] NA  P
-            └─Master读 ──┘└NACK└─STOP─┘
-              DATA 返回
+  S [ADDR+R] A [DATA= Slave回] A  NA  P
+            └─Master 接收─┘└─ACK─┘└NACK└─STOP─┘
+
+NACK 行为（关键）：
+  - 第 8 个 SCL 周期（数据位完成后），Master 驱动 SDA=1（NACK）
+  - NACK 是 Master **主动驱动 SDA=1**，不是"释放总线"
+  - SCL 第 9 个周期 Master 驱动 SDA=1，同时驱动 SCL=1
+  - 随后 Master 发送 STOP（SCL=1 时 SDA 0→1）
 ```
 
 ### 4.6 Master 连续读事务（多字节）
@@ -613,15 +654,18 @@ I2C 总线结果：
 CPU 操作顺序：
 1. 配置 I2C_TAR = 目标地址
 2. 配置 I2C_ENABLE.EN = 1
-3. 连续写 I2C_DATA_CMD 多次（CMD=1），数量=期望读字节数
-4. Controller 自动执行读事务直到所有 CMD 处理完
-5. 从 RX FIFO 依次读取数据
+3. 连续写 I2C_DATA_CMD{DAT=0x00, CMD=1} 三次（3 个读命令）
+4. Master FSM 自动执行连续读事务：
+   - 前 n-1 个 CMD=1：每接收一字节，Master 驱动 SDA=0（ACK）
+   - 最后 1 个 CMD=1：Master 驱动 SDA=1（NACK），随后 STOP
+5. 从 RX FIFO 依次读出 3 个数据字节
 
 I2C 总线结果（3字节示例）：
   S [ADDR+R] A [DATA0] A [DATA1] A [DATA2] NA  P
+                      ↑Master ACK   ↑Master ACK  ↑Master NACK
 ```
 
-### 4.7 Master Repeated START 读（写后读）
+### 4.7 Master Repeated START（写后读）
 
 ```
 场景：先写寄存器地址，再 Repeated START 读数据
@@ -630,13 +674,22 @@ CPU 操作顺序：
 1. 配置 I2C_TAR = 目标地址
 2. 配置 I2C_ENABLE.EN = 1
 3. 配置 I2C_CON.RESTART_EN = 1
-4. 写 I2C_DATA_CMD = {reg_addr, CMD=0}（写寄存器地址）
-5. 写 I2C_DATA_CMD = {8'h00, CMD=1}（触发读）
-6. 从 RX FIFO 读数据
+4. 写 I2C_DATA_CMD{DAT=reg_addr, CMD=0}（写寄存器地址）
+5. 写 I2C_DATA_CMD{DAT=0x00, CMD=1}（读命令）
+6. Master FSM 自动检测：
+   - CMD=0 后紧跟 CMD=1 → 在写事务后自动插入 Repeated START
+   - 不发 STOP，直接发 Repeated START 再发起读事务
+7. 从 RX FIFO 读数据
 
 I2C 总线结果：
   S [ADDR+W] A [REG] A  [ADDR+R] A [DATA] NA  P
-                  └─写─┘└─RepeatedSTART─┘└─读─┘
+              └─写 REG─┘└─RepeatedSTART─┘└─读─
+
+关键机制：
+  Master FSM 每次从 TX CMD FIFO 读取 CMD bit：
+    - 若当前 CMD=0，下一个 CMD=1 → 不发 STOP，发 Repeated START
+    - 若当前 CMD=0，下一个 CMD=0 → 当前字节发送完后，发 STOP
+    - 若 CMD=1 → 发 STOP
 ```
 
 ### 4.8 Slave 接收事务
@@ -644,21 +697,23 @@ I2C 总线结果：
 ```
 配置：
 1. 配置 I2C_SAR = 本机地址（7-bit）
-2. 配置 I2C_CON.MASTER_MODE=0, SLAVE_DISABLE=0
+2. 配置 I2C_CON.MASTER_MODE=0, SLAVE_DISABLE=0（启用 Slave）
 3. 配置 I2C_ENABLE.EN = 1
 
 I2C 总线行为：
-- 监听总线，匹配地址后进入 Slave 接收模式
-- 自动在 ACK 时隙拉低 SDA
-- 接收数据存入 RX FIFO
+- Slave FSM 监听总线，地址匹配后进入 Slave 接收模式
+- 在 ACK 时隙自动拉低 SDA（驱动 SDA=0）
+- 接收的每个字节存入 RX FIFO
+- STOP 检测后退出接收模式
 
 CPU 操作：
-1. 等待/轮询 I2C_RAW_INTR_STAT.R_RX_FULL
-2. 读 I2C_DATA_CMD（RX FIFO 深度内可连续读）
+1. 等待/轮询 I2C_RAW_INTR_STAT.R_RX_FULL 或 R_STOP_DET
+2. 读 I2C_DATA_CMD（连续读出 RX FIFO 中的数据）
 3. 处理数据
 
 I2C 总线结果（接收 2 字节）：
   S [ADDR+W] A [DATA0] A [DATA1] A  P
+              └─Slave ACK  ──┘└─Slave ACK─┘
 ```
 
 ### 4.9 Slave 发射事务
@@ -666,49 +721,78 @@ I2C 总线结果（接收 2 字节）：
 ```
 配置：
 1. 配置 I2C_SAR = 本机地址（7-bit）
-2. 预先写入 TX FIFO（至少 1 字节）
+2. 预先写入 TX DAT FIFO（写 DATA_CMD{DAT=val, CMD=0}，至少 1 字节）
 3. 配置 I2C_ENABLE.EN = 1
 
 I2C 总线行为：
-- 匹配地址 + R/W=1，进入 Slave 发射模式
-- 从 TX FIFO 取数据驱动 SDA
-- Master 发送 ACK/NACK
+- 匹配地址 + R/W=1，Slave 进入发射模式
+- 从 TX DAT FIFO 取数据驱动 SDA
+- 每发送一字节，Master 驱动 ACK/NACK
+- Master 发 NACK 后，Slave 检测到总线空闲，结束发射
 
 CPU 操作：
 1. 等待/轮询 I2C_RAW_INTR_STAT.R_RD_REQ（Master 请求读）
-2. 写 TX FIFO（必须快于 Master 的 SCL 时钟）
-3. 等待 R_RX_DONE（Master 发送 NACK 表示结束）
+2. 写 TX DAT FIFO（CMD=0，表示"准备发送数据"）
+3. 等待 R_RX_DONE（Master 发送 NACK 表示读事务结束）
 
 I2C 总线结果（Slave 返回 2 字节）：
   S [ADDR+R] A [DATA0] A [DATA1] NA  P
-              └─Slave 发射─┘└NACK└STOP─┘
+              └─Slave 发射─┘  Master ACK  ↑Master NACK
+
+重要：Slave 模式下，写 DATA_CMD 时 CMD 必须为 0。
+      CMD=1 在 Slave 模式下无意义（读事务由 Master 发起）。
 ```
 
 ### 4.10 TX_ABRT 中止条件
 
 | 中止原因 | 说明 |
 |---------|------|
-| ABRT_7B_NOACK | 目标地址无 ACK |
-| ABRT_TXDATA_NOACK | 数据字节无 ACK |
-| ABRT_ARB_LOST | 仲裁失败（总线上多个 Master 冲突） |
-| ABRT_MASTER_DIS | ENABLE=0 时 Master 尝试传输 |
-| ABRT_SLVRD_INTXFR | Slave 收到读请求但 TX FIFO 空 |
+| ABRT_7B_NOACK | 地址字节或数据字节发送后，接收方未拉低 SDA（NACK） |
+| ABRT_TXDATA_NOACK | 数据字节被 NACK |
+| ABRT_ARB_LOST | 总线仲裁失败（两个以上 Master 同时驱动 SDA 产生冲突） |
+| ABRT_MASTER_DIS | ENABLE=0 时，Master FSM 仍在尝试驱动总线 |
+| ABRT_SLVRD_INTXFR | Slave 收到 Master 的读请求，但 TX DAT FIFO 为空，Slave 无法响应 |
+| ABRT_10_NORSTRT | 10-bit 地址模式下，RESTART_EN=0 且 Master 试图发送 Repeated START |
 
 > **TX_ABRT 清零：** 读取 I2C_TX_ABRT_SOURCE 后自动清零。
+> **调试建议：** TX_ABRT 发生时，应检查总线连接、目标设备地址、从机是否正确响应。
 
 ---
 
 ## 5. FIFO 设计
 
-### 5.1 TX FIFO
+### 5.1 TX FIFO（DW_apb_i2c 真实结构：两条独立 FIFO）
+
+**TX CMD FIFO（命令 FIFO）：**
 
 | 参数 | 值 |
 |------|-----|
-| 深度 | 16 级（可配置） |
-| 宽度 | 9-bit（8-bit 数据 + 1-bit CMD） |
+| 深度 | 16 级 |
+| 宽度 | 1-bit（CMD） |
 | 复位 | presetn 异步清零 |
-| 满标志 | TXFLR == 5'd16 |
-| 空标志 | TXFLR == 5'd0 |
+| 满标志 | TXFLR[5]（CMD FIFO 满） |
+| 空标志 | TXFLR[4]（CMD FIFO 空） |
+
+**TX DAT FIFO（数据 FIFO）：**
+
+| 参数 | 值 |
+|------|-----|
+| 深度 | 16 级 |
+| 宽度 | 8-bit（DAT） |
+| 复位 | presetn 异步清零 |
+| 满标志 | TXFLR[3]（DAT FIFO 满） |
+| 空标志 | TXFLR[2]（DAT FIFO 空） |
+
+> **为什么要两条 FIFO？** CMD 决定事务类型（读/写），DAT 携带数据，两者必须按顺序配对。分离后 Master FSM 可以独立判断"下一个是读还是写"，同时灵活处理 Repeated START（CMD=0 紧跟 CMD=1）。
+
+**TXFLR 寄存器（0x38）位定义：**
+
+| Bit | 名称 | 描述 |
+|-----|------|------|
+| [4:0] | TXFLR | TX DAT FIFO 深度（数据字节数） |
+| [9:5] | Reserved | 保留 |
+
+> **实现注意：** 实际上只需一个 TXFLR[4:0] 表示 DAT FIFO 深度。CMD FIFO 和 DAT FIFO 深度相同（16），当 CMD FIFO 非空时，Master FSM 按序配对消费，故只需监控 DAT FIFO 深度即可判断"还有多少个未完成字节"。
 
 ### 5.2 RX FIFO
 
@@ -1074,4 +1158,5 @@ always_comb                                     // 组合逻辑
 
 | 版本 | 日期 | 修改内容 |
 |------|------|---------|
+| v2.1 | 2026-04-26 | 修正 Q1~Q3：TX CMD+DAT 双 FIFO 结构、Master 事务触发机制（写 DATA_CMD 填充 FIFO，Master 自动消费）、NACK 为 Master 主动驱动 SDA=1、Section 2.4 ACK/NACK 方向修正、Section 4.3~4.10 全部事务描述更新 |
 | v2.0 | 2026-04-26 | 全新规格，参考 DW_apb_i2c 架构，覆盖 Master+Slave 完整功能，Jack & 小蜂 |
