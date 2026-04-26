@@ -5,6 +5,8 @@
 **日期:** 2026-04-26
 **作者:** Jack & 小蜂
 **架构参考:** DesignWare DW_apb_i2c
+**协议参考:** NXP UM10204 I2C-bus specification and user manual (Rev.7, 2021)
+**UM10204 下载:** https://www.nxp.com/docs/en/user-guide/UM10204.pdf
 
 ---
 
@@ -141,6 +143,101 @@
 | 地址不匹配 | Master | Slave 保持高阻，Master 自己可拉低（NACK） |
 | 数据接收 OK | Master | Slave 拉低 SDA |
 | 数据接收异常 | Master | Slave 保持高阻 |
+
+---
+
+### 2.5 NXP UM10204 时序参数（官方 I2C 总线标准）
+
+> **参考文档：** NXP UM10204 — I2C-bus specification and user manual（I2C-bus Specification UM10204, Rev. 7, October 2021）
+> **下载地址：** https://www.nxp.com/docs/en/user-guide/UM10204.pdf
+
+#### 2.5.1 Standard-mode (100kHz) 时序参数
+
+| 符号 | 参数 | 最小值 | 最大值 | 单位 | 说明 |
+|------|------|--------|--------|------|------|
+| f_SCL | SCL 时钟频率 | — | 100 | kHz | |
+| t_LOW | SCL 低电平时间 | 4.7 | — | μs | Master 驱动 |
+| t_HIGH | SCL 高电平时间 | 4.0 | — | μs | Master 驱动 |
+| t_SU_STA | START 建立时间 | 4.7 | — | μs | SDA 下降前 SCL 高电平时间 |
+| t_HD_STA | START 保持时间 | 4.0 | — | μs | SCL 下降沿后 SDA 保持低的时间 |
+| t_SU_DAT | 数据建立时间 | 250 | — | ns | SCL 上升沿前 SDA 稳定时间 |
+| t_HD_DAT | 数据保持时间 | 0 | 3.45 | μs | SCL 下降沿后 SDA 保持时间 |
+| t_SU_STO | STOP 建立时间 | 4.0 | — | μs | SCL 高电平期间 SDA 上升沿 |
+| t_BUF | 总线空闲时间 | 4.7 | — | μs | STOP 到下一个 START 之间 |
+| t_r | SDA/SCL 上升沿时间 | — | 1000 | ns | 总线上 RC 常数决定 |
+| t_f | SDA/SCL 下降沿时间 | — | 300 | ns | 总线电容 < 200pF 时 |
+
+#### 2.5.2 Fast-mode (400kHz) 时序参数
+
+| 符号 | 参数 | 最小值 | 最大值 | 单位 | 说明 |
+|------|------|--------|--------|------|------|
+| f_SCL | SCL 时钟频率 | — | 400 | kHz | |
+| t_LOW | SCL 低电平时间 | 1.3 | — | μs | |
+| t_HIGH | SCL 高电平时间 | 0.6 | — | μs | |
+| t_SU_STA | START 建立时间 | 0.6 | — | μs | |
+| t_HD_STA | START 保持时间 | 0.6 | — | μs | |
+| t_SU_DAT | 数据建立时间 | 100 | — | ns | |
+| t_HD_DAT | 数据保持时间 | 0 | 0.9 | μs | |
+| t_SU_STO | STOP 建立时间 | 0.6 | — | μs | |
+| t_BUF | 总线空闲时间 | 1.3 | — | μs | |
+| t_r | SDA/SCL 上升沿时间 | 20 | 300 | ns | |
+| t_f | SDA/SCL 下降沿时间 | — | 300 | ns | |
+
+#### 2.5.3 Fast-mode Plus (1MHz) 时序参数
+
+| 符号 | 参数 | 最小值 | 最大值 | 单位 | 说明 |
+|------|------|--------|--------|------|------|
+| f_SCL | SCL 时钟频率 | — | 1000 | kHz | |
+| t_LOW | SCL 低电平时间 | 0.5 | — | μs | |
+| t_HIGH | SCL 高电平时间 | 0.26 | — | μs | |
+| t_SU_STA | START 建立时间 | 0.26 | — | μs | |
+| t_HD_STA | START 保持时间 | 0.26 | — | μs | |
+| t_SU_DAT | 数据建立时间 | 50 | — | ns | |
+| t_HD_DAT | 数据保持时间 | 0 | 0.7 | μs | |
+| t_SU_STO | STOP 建立时间 | 0.26 | — | μs | |
+| t_BUF | 总线空闲时间 | 0.5 | — | μs | |
+
+#### 2.5.4 时序图（START / 数据 / STOP）
+
+```
+         START condition
+            │
+    SDA ───┐  ┌───────────────────────/──────────────
+            └──┘                              SDA: 1→0 while SCL=1
+                  7-bit address │R/W│   8-bit data    │
+    SCL ───┐  ┌─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─┬─
+            └──┴─┴─┴─┴─┴─┴─┴─┴─┴─┴─┴─┴─┴─┴─┴─┴─┴─┴─┴─┴─┴─┘
+                 │                             │
+                 0   1   2   3   4   5   6   7   0   1 ...
+                 ADDR[6:0]    R/W   DATA[7:0]
+
+         ACK bit after each byte:
+              SCL ──┐  ┌────────────────────────
+                    └──┘
+                    SDA pulled LOW by receiver during ACK
+
+         STOP condition:
+                          SDA ────────┐  ┌─────
+                                      └──┘     SDA: 0→1 while SCL=1
+                    SCL ────────────────────┘
+```
+
+#### 2.5.5 SDA 数据采样点说明
+
+```
+SCL ─────────────┬─────────────────────┬─────────────────────
+                  │ rising edge         │
+                  │ (sample point)      │
+              ───┴─────────────────────┴───────────────────────
+SDA: ─────────────────[bit changes]──────────────
+                  │← t_SU_DAT →│← t_HD_DAT →│
+                  数据建立      数据保持
+```
+
+**RTL 设计要点：**
+- **采样时刻：** SCL 上升沿前 t_SU_DAT 时间内 SDA 必须稳定
+- **数据变化窗口：** SCL 高电平期间 SDA 严禁变化（START/STOP 除外）
+- **设计实现：** 本 Controller 以 pclk 为参考，HCNT/LCNT 决定 SCL 频率，实际 t_SU_DAT / t_HD_DAT 取决于 pclk 分频比和 SDA 同步器延迟
 
 ---
 
