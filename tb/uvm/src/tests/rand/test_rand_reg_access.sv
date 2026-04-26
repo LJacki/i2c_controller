@@ -6,7 +6,7 @@ class test_rand_reg_access extends base_test;
   `uvm_component_utils(test_rand_reg_access)
 
   // Register addresses to test (all defined registers per SPEC v2.2)
-  bit [7:0] reg_addrs[] = '{
+  logic [7:0] reg_addrs[] = '{
     8'h00, 8'h04, 8'h08, 8'h0C,
     8'h10, 8'h14, 8'h18, 8'h1C,
     8'h20, 8'h2C, 8'h30, 8'h34,
@@ -20,20 +20,17 @@ class test_rand_reg_access extends base_test;
   endfunction
 
   task run_phase(uvm_phase phase);
-      bit [7:0] addr = reg_addrs[$urandom_range(0, reg_addrs.size()-1)];
-      bit [31:0] wdata = $urandom();
-      bit [31:0] rdata;
-      bit is_write = $urandom_range(0, 1);
-      bit [31:0] val;
-      bit [31:0] val;
-      bit [31:0] val;
     phase.raise_objection(this);
     `uvm_info("TEST_RAND_REG_ACCESS", "Starting Random Register Access Test...", UVM_MEDIUM)
 
     // Perform random read/write sequence
     for (int i = 0; i < num_accesses; i++) begin
+      logic [7:0] addr = reg_addrs[$urandom_range(0, reg_addrs.size()-1)];
+      logic [31:0] wdata = $urandom();
+      logic [31:0] rdata;
 
       // Randomly choose read or write
+      bit is_write = $urandom_range(0, 1);
 
       if (is_write) begin
         apb_write(addr, wdata);
@@ -54,6 +51,7 @@ class test_rand_reg_access extends base_test;
     // Specific register tests
     // Test all TX_TL values (0, 4, 8, 15)
     begin
+      logic [31:0] val;
       int tl_vals[] = '{0, 4, 8, 15};
       foreach (tl_vals[i]) begin
         apb_write(8'h30, tl_vals[i]);  // TX_TL
@@ -64,6 +62,7 @@ class test_rand_reg_access extends base_test;
 
     // Test all RX_TL values (0, 4, 8, 15)
     begin
+      logic [31:0] val;
       int tl_vals[] = '{0, 4, 8, 15};
       foreach (tl_vals[i]) begin
         apb_write(8'h2C, tl_vals[i]);  // RX_TL
@@ -74,6 +73,7 @@ class test_rand_reg_access extends base_test;
 
     // Test SDA_HOLD values
     begin
+      logic [31:0] val;
       apb_write(8'h44, 16'h0001);
       apb_read(8'h44, val);
       apb_write(8'h44, 16'h00FF);
@@ -87,7 +87,7 @@ class test_rand_reg_access extends base_test;
     phase.drop_objection(this);
   endtask
 
-  task apb_write(bit [7:0] addr, bit [31:0] data);
+  task apb_write(logic [7:0] addr, logic [31:0] data);
     apb_transfer tr;
     tr = apb_transfer::type_id::create("tr");
     tr.kind  = apb_transfer::APB_WRITE;
@@ -97,7 +97,7 @@ class test_rand_reg_access extends base_test;
     env.apb_drv.seq_item_port.put(tr);
   endtask
 
-  task apb_read(bit [7:0] addr, output bit [31:0] data);
+  task apb_read(logic [7:0] addr, output logic [31:0] data);
     apb_transfer tr;
     tr = apb_transfer::type_id::create("tr");
     tr.kind = apb_transfer::APB_READ;

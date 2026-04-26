@@ -10,7 +10,8 @@ class test_basic_master_data_nack extends base_test;
   endfunction
 
   task run_phase(uvm_phase phase);
-    bit [31:0] txabrt;
+  begin
+    logic [31:0] txabrt;
     phase.raise_objection(this);
     `uvm_info("TEST_BASIC_MASTER_DATA_NACK", "Starting Master Data NACK Test...", UVM_MEDIUM)
 
@@ -41,9 +42,10 @@ class test_basic_master_data_nack extends base_test;
       `uvm_info("TEST_BASIC_MASTER_DATA_NACK", "ABRT_TXDATA_NOACK not set (stub RTL or bus not connected)", UVM_MEDIUM)
 
     phase.drop_objection(this);
+  end
   endtask
 
-  task apb_write(bit [7:0] addr, bit [31:0] data);
+  task apb_write(logic [7:0] addr, logic [31:0] data);
     apb_transfer tr;
     tr = apb_transfer::type_id::create("tr");
     tr.kind  = apb_transfer::APB_WRITE;
@@ -53,7 +55,7 @@ class test_basic_master_data_nack extends base_test;
     env.apb_drv.seq_item_port.put(tr);
   endtask
 
-  task apb_read(bit [7:0] addr, output bit [31:0] data);
+  task apb_read(logic [7:0] addr, output logic [31:0] data);
     apb_transfer tr;
     tr = apb_transfer::type_id::create("tr");
     tr.kind = apb_transfer::APB_READ;

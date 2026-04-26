@@ -9,9 +9,10 @@ class test_interrupt_stop_det extends base_test;
   endfunction
 
   task run_phase(uvm_phase phase);
-    bit [31:0] raw_intr;
-    bit [31:0] intr_stat;
-    bit [31:0] raw_intr2;
+  begin
+    logic [31:0] raw_intr;
+    logic [31:0] intr_stat;
+    logic [31:0] raw_intr2;
     phase.raise_objection(this);
     `uvm_info("TEST_INTERRUPT_STOP_DET", "Starting STOP_DET Interrupt Test...", UVM_MEDIUM)
 
@@ -66,9 +67,10 @@ class test_interrupt_stop_det extends base_test;
 
     `uvm_info("TEST_INTERRUPT_STOP_DET", "STOP_DET interrupt test completed", UVM_MEDIUM)
     phase.drop_objection(this);
+  end
   endtask
 
-  task apb_write(bit [7:0] addr, bit [31:0] data);
+  task apb_write(logic [7:0] addr, logic [31:0] data);
     apb_transfer tr;
     tr = apb_transfer::type_id::create("tr");
     tr.kind  = apb_transfer::APB_WRITE;
@@ -78,7 +80,7 @@ class test_interrupt_stop_det extends base_test;
     env.apb_drv.seq_item_port.put(tr);
   endtask
 
-  task apb_read(bit [7:0] addr, output bit [31:0] data);
+  task apb_read(logic [7:0] addr, output logic [31:0] data);
     apb_transfer tr;
     tr = apb_transfer::type_id::create("tr");
     tr.kind = apb_transfer::APB_READ;

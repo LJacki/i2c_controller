@@ -10,8 +10,8 @@ class test_basic_master_burst_read extends base_test;
   endfunction
 
   task run_phase(uvm_phase phase);
-    bit [31:0] rxflr;
-      bit [31:0] rx_data;
+  begin
+    logic [31:0] rxflr;
     phase.raise_objection(this);
     `uvm_info("TEST_BASIC_MASTER_BURST_READ", "Starting Master Burst Read Test (8 bytes)...", UVM_MEDIUM)
 
@@ -38,15 +38,17 @@ class test_basic_master_burst_read extends base_test;
 
     // Drain RX FIFO
     for (int i = 0; i < 8; i++) begin
+      logic [31:0] rx_data;
       apb_read(8'h0C, rx_data);
       `uvm_info("TEST_BASIC_MASTER_BURST_READ", $sformatf("RX[%0d]=0x%02x", i, rx_data[7:0]), UVM_MEDIUM)
     end
 
     `uvm_info("TEST_BASIC_MASTER_BURST_READ", "Master Burst Read Test PASSED", UVM_MEDIUM)
     phase.drop_objection(this);
+  end
   endtask
 
-  task apb_write(bit [7:0] addr, bit [31:0] data);
+  task apb_write(logic [7:0] addr, logic [31:0] data);
     apb_transfer tr;
     tr = apb_transfer::type_id::create("tr");
     tr.kind  = apb_transfer::APB_WRITE;
@@ -56,7 +58,7 @@ class test_basic_master_burst_read extends base_test;
     env.apb_drv.seq_item_port.put(tr);
   endtask
 
-  task apb_read(bit [7:0] addr, output bit [31:0] data);
+  task apb_read(logic [7:0] addr, output logic [31:0] data);
     apb_transfer tr;
     tr = apb_transfer::type_id::create("tr");
     tr.kind = apb_transfer::APB_READ;

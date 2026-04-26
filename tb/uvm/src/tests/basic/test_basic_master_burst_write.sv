@@ -10,8 +10,8 @@ class test_basic_master_burst_write extends base_test;
   endfunction
 
   task run_phase(uvm_phase phase);
-      bit [7:0] data_byte = 8'hA0 + i;
-    bit [31:0] txflr;
+  begin
+    logic [31:0] txflr;
     phase.raise_objection(this);
     `uvm_info("TEST_BASIC_MASTER_BURST_WRITE", "Starting Master Burst Write Test (8 bytes)...", UVM_MEDIUM)
 
@@ -24,6 +24,7 @@ class test_basic_master_burst_write extends base_test;
 
     // Write 8 bytes consecutively (CMD=0 for all = write transactions)
     for (int i = 0; i < 8; i++) begin
+      logic [7:0] data_byte = 8'hA0 + i;
       apb_write(8'h0C, {24'b0, data_byte});  // DAT=data, CMD=0
       `uvm_info("TEST_BASIC_MASTER_BURST_WRITE", $sformatf("Wrote DATA_CMD[0x%02x]=0x%02x", i, data_byte), UVM_MEDIUM)
       #2us;  // small spacing between writes
@@ -37,9 +38,10 @@ class test_basic_master_burst_write extends base_test;
 
     `uvm_info("TEST_BASIC_MASTER_BURST_WRITE", "Master Burst Write Test PASSED", UVM_MEDIUM)
     phase.drop_objection(this);
+  end
   endtask
 
-  task apb_write(bit [7:0] addr, bit [31:0] data);
+  task apb_write(logic [7:0] addr, logic [31:0] data);
     apb_transfer tr;
     tr = apb_transfer::type_id::create("tr");
     tr.kind  = apb_transfer::APB_WRITE;
@@ -49,7 +51,7 @@ class test_basic_master_burst_write extends base_test;
     env.apb_drv.seq_item_port.put(tr);
   endtask
 
-  task apb_read(bit [7:0] addr, output bit [31:0] data);
+  task apb_read(logic [7:0] addr, output logic [31:0] data);
     apb_transfer tr;
     tr = apb_transfer::type_id::create("tr");
     tr.kind = apb_transfer::APB_READ;

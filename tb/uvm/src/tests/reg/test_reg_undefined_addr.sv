@@ -9,9 +9,10 @@ class test_reg_undefined_addr extends base_test;
   endfunction
 
   task run_phase(uvm_phase phase);
+  begin
     int error_count = 0;
-    bit [31:0] val;
-    bit [7:0] test_addrs[] = '{8'h50, 8'h60, 8'h70, 8'h80, 8'h90, 8'hA0, 8'hB0, 8'hC0, 8'hD0, 8'hE0, 8'hF0, 8'hFF};
+    logic [31:0] val;
+    logic [7:0] test_addrs[] = '{8'h50, 8'h60, 8'h70, 8'h80, 8'h90, 8'hA0, 8'hB0, 8'hC0, 8'hD0, 8'hE0, 8'hF0, 8'hFF};
     phase.raise_objection(this);
     `uvm_info("TEST_REG_UNDEFINED_ADDR", "Starting Undefined Address Test...", UVM_MEDIUM)
 
@@ -57,9 +58,10 @@ class test_reg_undefined_addr extends base_test;
       `uvm_error("TEST_REG_UNDEFINED_ADDR", $sformatf("Undefined Address Test FAILED with %0d errors", error_count))
 
     phase.drop_objection(this);
+  end
   endtask
 
-  task apb_write(bit [7:0] addr, bit [31:0] data);
+  task apb_write(logic [7:0] addr, logic [31:0] data);
     apb_transfer tr;
     tr = apb_transfer::type_id::create("tr");
     tr.kind  = apb_transfer::APB_WRITE;
@@ -69,7 +71,7 @@ class test_reg_undefined_addr extends base_test;
     env.apb_drv.seq_item_port.put(tr);
   endtask
 
-  task apb_read(bit [7:0] addr, output bit [31:0] data);
+  task apb_read(logic [7:0] addr, output logic [31:0] data);
     apb_transfer tr;
     tr = apb_transfer::type_id::create("tr");
     tr.kind = apb_transfer::APB_READ;

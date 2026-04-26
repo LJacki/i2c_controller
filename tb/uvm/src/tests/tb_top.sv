@@ -3,6 +3,7 @@
 
 module tb_top;
 
+  import uvm_pkg::*;
   import i2c_ctrl_pkg::*;
 
   // Clock and reset
@@ -18,14 +19,14 @@ module tb_top;
   bit [31:0] prdata;
   bit        pready;
 
-  // I2C signals
-  bit scl_i;
-  bit scl_o;
-  bit scl_oe;
-  bit sda_i;
-  bit sda_o;
-  bit sda_oe;
-  bit intr;
+  // I2C signals (logic type to allow multiple drivers)
+  logic scl_i;
+  logic scl_o;
+  logic scl_oe;
+  logic sda_i;
+  logic sda_o;
+  logic sda_oe;
+  logic intr;
 
   // Instantiate APB interface
   apb_if apb_if_inst (.pclk(pclk), .presetn(presetn));
@@ -46,19 +47,9 @@ module tb_top;
     presetn = 1;
   end
 
-  // Initialize I2C signals with pull-ups (wire-AND simulation)
-  initial begin
-    scl_i = 1'b1;
-    sda_i = 1'b1;
-  end
-
-  // Drive I2C outputs when enabled (simple wire-AND behavior)
-  always begin
-    #1;
-    // Weak pull-up simulation
-    if (scl_oe == 1'b0) scl_i <= #(1) 1'b1;
-    if (sda_oe == 1'b0) sda_i <= #(1) 1'b1;
-  end
+  // I2C wire resolution (multiple drivers via assign - tri-state behavior)
+  assign scl_i = (scl_oe) ? scl_o : 1'b1;  // pull-up when OE=0
+  assign sda_i = (sda_oe) ? sda_o : 1'b1;  // pull-up when OE=0
 
   // DUT instantiation
   i2c_ctrl_top dut (
@@ -79,10 +70,6 @@ module tb_top;
     .sda_oe(sda_oe),
     .intr(intr)
   );
-
-  // I2C wire resolution (multiple drivers)
-  assign scl_i = (scl_oe) ? scl_o : 1'b1;
-  assign sda_i = (sda_oe) ? sda_o : 1'b1;
 
   // UVM run task
   initial begin

@@ -6,8 +6,8 @@ class test_rand_master_write extends base_test;
   `uvm_component_utils(test_rand_master_write)
 
   // Random variables
-  rand bit [6:0]  rand_addr;
-  rand bit [7:0]  rand_data[];
+  rand logic [6:0]  rand_addr;
+  rand logic [7:0]  rand_data[];
   rand int        rand_byte_count;
 
   // Constraints
@@ -27,8 +27,8 @@ class test_rand_master_write extends base_test;
   endfunction
 
   task run_phase(uvm_phase phase);
-    logic [31:0] status;
   begin
+    logic [31:0] status;
     phase.raise_objection(this);
     `uvm_info("TEST_RAND_MASTER_WRITE", "Starting Random Master Write Test...", UVM_MEDIUM)
 
@@ -68,9 +68,10 @@ class test_rand_master_write extends base_test;
 
     `uvm_info("TEST_RAND_MASTER_WRITE", "Random Master Write Test PASSED", UVM_MEDIUM)
     phase.drop_objection(this);
+  end
   endtask
 
-  task apb_write(bit [7:0] addr, bit [31:0] data);
+  task apb_write(logic [7:0] addr, logic [31:0] data);
     apb_transfer tr;
     tr = apb_transfer::type_id::create("tr");
     tr.kind  = apb_transfer::APB_WRITE;
@@ -80,7 +81,7 @@ class test_rand_master_write extends base_test;
     env.apb_drv.seq_item_port.put(tr);
   endtask
 
-  task apb_read(bit [7:0] addr, output bit [31:0] data);
+  task apb_read(logic [7:0] addr, output logic [31:0] data);
     apb_transfer tr;
     tr = apb_transfer::type_id::create("tr");
     tr.kind = apb_transfer::APB_READ;
