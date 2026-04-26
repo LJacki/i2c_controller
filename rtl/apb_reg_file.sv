@@ -1,6 +1,7 @@
 // apb_reg_file.sv - APB Register File for I2C Controller
-// 19 registers at offsets 0x00~0x48
+// 20 registers at offsets 0x00~0x4C (SPEC v2.2)
 // pready fixed at 1 (no wait states)
+// INTR_STAT at 0x24 (post-mask), RAW_INTR_STAT at 0x28 (pre-mask)
 
 module apb_reg_file (
     input  logic pclk,
@@ -103,25 +104,27 @@ module apb_reg_file (
     logic [31:0] ic_fs_lcnt;
     // 0x20 I2C_INTR_MASK
     logic [31:0] ic_intr_mask;
-    // 0x24 I2C_RAW_INTR_STAT (RO, some bits WC1R)
+    // 0x24 I2C_INTR_STAT (RO, post-mask, = RAW & ~MASK)
+    logic [31:0] ic_intr_stat;
+    // 0x28 I2C_RAW_INTR_STAT (RO, pre-mask)
     logic [31:0] ic_raw_intr_stat;
-    // 0x28 I2C_RX_TL
+    // 0x2C I2C_RX_TL
     logic [31:0] ic_rx_tl;
-    // 0x2C I2C_TX_TL
+    // 0x30 I2C_TX_TL
     logic [31:0] ic_tx_tl;
-    // 0x30 I2C_ENABLE
+    // 0x34 I2C_ENABLE
     logic [31:0] ic_enable;
-    // 0x34 I2C_STATUS (RO, updated continuously)
+    // 0x38 I2C_STATUS (RO, updated continuously)
     logic [31:0] ic_status;
-    // 0x38 I2C_TXFLR (RO)
+    // 0x3C I2C_TXFLR (RO)
     logic [31:0] ic_txflr;
-    // 0x3C I2C_RXFLR (RO)
+    // 0x40 I2C_RXFLR (RO)
     logic [31:0] ic_rxflr;
-    // 0x40 I2C_SDA_HOLD
+    // 0x44 I2C_SDA_HOLD
     logic [31:0] ic_sda_hold;
-    // 0x44 I2C_TX_ABRT_SOURCE (RO, clr on read)
+    // 0x48 I2C_TX_ABRT_SOURCE (RO, clr on read)
     logic [31:0] ic_tx_abrt_source;
-    // 0x48 I2C_ENABLE_STATUS (RO)
+    // 0x4C I2C_ENABLE_STATUS (RO)
     logic [31:0] ic_enable_status;
 
     // ============================================================
@@ -130,7 +133,7 @@ module apb_reg_file (
     always_ff @(posedge pclk or negedge presetn) begin
         if (!presetn)
             tx_abrt_read_flag <= 1'b0;
-        else if (reg_read_en && (paddr == 8'h44))
+        else if (reg_read_en && (paddr == 8'h48))
             tx_abrt_read_flag <= 1'b1;
         else
             tx_abrt_read_flag <= 1'b0;
@@ -178,10 +181,17 @@ module apb_reg_file (
                     8'h18: ic_fs_hcnt      <= pwdata;
                     8'h1C: ic_fs_lcnt      <= pwdata;
                     8'h20: ic_intr_mask    <= pwdata;
-                    8'h28: ic_rx_tl        <= pwdata;
-                    8'h2C: ic_tx_tl        <= pwdata;
-                    8'h30: ic_enable       <= pwdata;
-                    8'h40: ic_sda_hold    <= pwdata;
+                    // 0x24 INTR_STAT: RO, no write
+                    8'h28: ic_raw_intr_stat <= pwdata;  // WC1R handled elsewhere
+                    8'h2C: ic_rx_tl        <= pwdata;
+                    8'h30: ic_tx_tl        <= pwdata;
+                    8'h34: ic_enable       <= pwdata;
+                    // 0x38 STATUS: RO, no write
+                    // 0x3C TXFLR: RO, no write
+                    // 0x40 RXFLR: RO, no write
+                    8'h44: ic_sda_hold    <= pwdata;
+                    // 0x48 TX_ABORT_SOURCE: RO, no write
+                    // 0x4C ENABLE_STATUS: RO, no write
                     default: ; // read-only or reserved
                 endcase
             end
@@ -204,6 +214,9 @@ module apb_reg_file (
     logic [31:0] next_prdata;
 
     // Decode address combinationally
+    // INTR_STAT = masked interrupt (post-mask)
+    assign ic_intr_stat = {21'b0, raw_intr_stat & ~intr_mask};
+
     always_comb begin
         case (paddr)
             8'h00: next_prdata = ic_con;
@@ -215,17 +228,18 @@ module apb_reg_file (
             8'h18: next_prdata = ic_fs_hcnt;
             8'h1C: next_prdata = ic_fs_lcnt;
             8'h20: next_prdata = ic_intr_mask;
-            8'h24: next_prdata = {21'b0, raw_intr_stat};
-            8'h28: next_prdata = ic_rx_tl;
-            8'h2C: next_prdata = ic_tx_tl;
-            8'h30: next_prdata = ic_enable;
-            8'h34: next_prdata = ic_status;
-            8'h38: next_prdata = {27'b0, txflr};
-            8'h3C: next_prdata = {27'b0, rxflr};
-            8'h40: next_prdata = ic_sda_hold;
-            8'h44: next_prdata = {16'b0, tx_abrt_source};
-            8'h48: next_prdata = {29'b0, mst_activity_disabled, slv_activity_disabled, ic_en};
-            default: next_prdata = 32'b0;
+            8'h24: next_prdata = ic_intr_stat;     // INTR_STAT: post-mask
+            8'h28: next_prdata = {21'b0, raw_intr_stat}; // RAW_INTR_STAT: pre-mask
+            8'h2C: next_prdata = ic_rx_tl;
+            8'h30: next_prdata = ic_tx_tl;
+            8'h34: next_prdata = ic_enable;
+            8'h38: next_prdata = ic_status;
+            8'h3C: next_prdata = {27'b0, txflr};
+            8'h40: next_prdata = {27'b0, rxflr};
+            8'h44: next_prdata = ic_sda_hold;
+            8'h48: next_prdata = {16'b0, tx_abrt_source};
+            8'h4C: next_prdata = {29'b0, mst_activity_disabled, slv_activity_disabled, ic_en};
+            default: next_prdata = 32'h0;  // undefined address returns 0
         endcase
     end
 
