@@ -2,9 +2,11 @@
 # Top-level sim Makefile for UVM verification
 
 PROJECT_ROOT := $(shell cd $(dir $(lastword $(MAKEFILE_LIST)))/.. && pwd)
-RTL_FLIST    := $(PROJECT_ROOT)/rtl/filelist.f
-TB_FLIST     := $(PROJECT_ROOT)/tb/uvm/filelist.f
-UVM_DIR      := $(VCS_HOME)/etc/uvm
+RTL_DIR      := $(PROJECT_ROOT)/rtl
+UVM_DIR      := $(PROJECT_ROOT)/tb/uvm
+RTL_FLIST    := $(RTL_DIR)/filelist.f
+TB_FLIST    := $(UVM_DIR)/filelist.f
+UVM_MACROS  := $(VCS_HOME)/etc/uvm/uvm_macros.svh
 
 # Tool
 VCS          := vcs
@@ -14,7 +16,6 @@ VCS_FLAGS    := -sverilog \
                 -ntb_opts uvm \
                 -cm line+cond+fsm+branch+tgl \
                 -cm_name i2c_ctrl \
-                +incdir+$(UVM_DIR) \
                 -notice -reportstats
 
 # Test name (override with TEST=<name>)
@@ -28,6 +29,7 @@ SIM_LOG      := $(PROJECT_ROOT)/sim/$(TEST).log
 .PHONY: compile sim clean help
 
 # Compile RTL + TB
+# RTL files are listed relative to project root (in rtl/ subdir)
 compile: clean_sim
 	@echo "=== Compiling i2c_controller (RTL + UVM TB) ==="
 	@echo "PROJECT_ROOT=$(PROJECT_ROOT)"

@@ -30,10 +30,37 @@ package i2c_ctrl_pkg;
   // Test infrastructure
   `include "tests/test_cfg.sv"
   `include "tests/base_test.sv"
-  `include "tests/test_master_single_write.sv"
-  `include "tests/test_master_single_read.sv"
-  `include "tests/test_master_burst_write.sv"
-  `include "tests/test_slave_receive.sv"
-  `include "tests/test_slave_transmit.sv"
+
+  // === Basic Directed Tests ===
+  `include "tests/basic/test_basic_master_single_write.sv"
+  `include "tests/basic/test_basic_master_burst_write.sv"
+  `include "tests/basic/test_basic_master_single_read.sv"
+  `include "tests/basic/test_basic_master_burst_read.sv"
+  `include "tests/basic/test_basic_master_repeated_start.sv"
+  `include "tests/basic/test_basic_master_addr_nack.sv"
+  `include "tests/basic/test_basic_master_data_nack.sv"
+  `include "tests/basic/test_basic_slave_receive.sv"
+  `include "tests/basic/test_basic_slave_transmit.sv"
+  `include "tests/basic/test_basic_slave_addr_no_match.sv"
+
+  // === Interrupt Tests ===
+  `include "tests/interrupt/test_interrupt_rx_full.sv"
+  `include "tests/interrupt/test_interrupt_tx_empty.sv"
+  `include "tests/interrupt/test_interrupt_tx_abrt.sv"
+  `include "tests/interrupt/test_interrupt_stop_det.sv"
+
+  // === Register Tests ===
+  `include "tests/reg/test_reg_con_write_read.sv"
+  `include "tests/reg/test_reg_tar_sar.sv"
+  `include "tests/reg/test_reg_hcnt_lcnt_speed.sv"
+  `include "tests/reg/test_reg_enable_abort.sv"
+  `include "tests/reg/test_reg_undefined_addr.sv"
+
+  // === Constrained Random Tests ===
+  `include "tests/rand/test_rand_master_write.sv"
+  `include "tests/rand/test_rand_master_read.sv"
+  `include "tests/rand/test_rand_slave_receive.sv"
+  `include "tests/rand/test_rand_reg_access.sv"
+  `include "tests/rand/test_rand_interrupt_mask.sv"
 
 endpackage : i2c_ctrl_pkg

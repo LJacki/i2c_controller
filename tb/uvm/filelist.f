@@ -1,6 +1,6 @@
-# I2C Controller Verification - VCS Source Files
-#
-# All SystemVerilog source files for UVM verification
+// I2C Controller Verification - VCS Source Files
+//
+// All SystemVerilog source files for UVM verification
 
 # UVM and interfaces
 +incdir+./src
@@ -27,14 +27,43 @@
 ./src/env/scoreboard.sv
 ./src/env/i2c_ctrl_env.sv
 
-# Tests
+# Tests - infrastructure
 ./src/tests/test_cfg.sv
 ./src/tests/base_test.sv
-./src/tests/test_master_single_write.sv
-./src/tests/test_master_single_read.sv
-./src/tests/test_master_burst_write.sv
-./src/tests/test_slave_receive.sv
-./src/tests/test_slave_transmit.sv
+
+# Tests - basic directed (Master/Slave functional)
+./src/tests/basic/test_basic_master_single_write.sv
+./src/tests/basic/test_basic_master_burst_write.sv
+./src/tests/basic/test_basic_master_single_read.sv
+./src/tests/basic/test_basic_master_burst_read.sv
+./src/tests/basic/test_basic_master_repeated_start.sv
+./src/tests/basic/test_basic_master_addr_nack.sv
+./src/tests/basic/test_basic_master_data_nack.sv
+./src/tests/basic/test_basic_slave_receive.sv
+./src/tests/basic/test_basic_slave_transmit.sv
+./src/tests/basic/test_basic_slave_addr_no_match.sv
+
+# Tests - interrupt
+./src/tests/interrupt/test_interrupt_rx_full.sv
+./src/tests/interrupt/test_interrupt_tx_empty.sv
+./src/tests/interrupt/test_interrupt_tx_abrt.sv
+./src/tests/interrupt/test_interrupt_stop_det.sv
+
+# Tests - register
+./src/tests/reg/test_reg_con_write_read.sv
+./src/tests/reg/test_reg_tar_sar.sv
+./src/tests/reg/test_reg_hcnt_lcnt_speed.sv
+./src/tests/reg/test_reg_enable_abort.sv
+./src/tests/reg/test_reg_undefined_addr.sv
+
+# Tests - constrained random
+./src/tests/rand/test_rand_master_write.sv
+./src/tests/rand/test_rand_master_read.sv
+./src/tests/rand/test_rand_slave_receive.sv
+./src/tests/rand/test_rand_reg_access.sv
+./src/tests/rand/test_rand_interrupt_mask.sv
+
+# Testbench top
 ./src/tests/tb_top.sv
 
 # RTL Stub (placeholder until real RTL available)

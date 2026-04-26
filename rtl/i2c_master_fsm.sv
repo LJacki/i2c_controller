@@ -49,9 +49,69 @@ module i2c_master_fsm (
 );
 
     // ============================================================
+    // Internal signal declarations (module scope - all declared before use)
+    // ============================================================
+    // HCNT/LCNT selection based on speed
+    logic [15:0] hcnt, lcnt;
+    // SCL clock generation
+    logic [15:0] scl_cnt;
+    logic        scl_cnt_en;
+    logic        scl_cnt_rst;
+    logic        in_high_phase;
+    logic        scl_o_int;
+    // SCL edge detection
+    logic        scl_prev;
+    logic        scl_rising, scl_falling;
+    // FSM state
+    typedef enum logic [3:0] {
+        ST_IDLE       = 4'd0,
+        ST_START      = 4'd1,
+        ST_ADDR_BIT   = 4'd2,
+        ST_ADDR_ACK   = 4'd3,
+        ST_WDATA_BIT  = 4'd4,
+        ST_WDATA_ACK  = 4'd5,
+        ST_RDATA_BIT  = 4'd6,
+        ST_RDATA_ACK  = 4'd7,
+        ST_RESTART    = 4'd8,
+        ST_STOP       = 4'd9
+    } state_t;
+    state_t state, next_state;
+    // CMD/DAT holding registers
+    logic       cur_cmd;
+    logic [7:0] cur_dat;
+    logic       have_cur;
+    logic       nxt_cmd;
+    logic [7:0] nxt_dat;
+    logic       have_nxt;
+    logic       peek_cmd;
+    // TX byte construction and FIFO pop
+    logic       pop_at_ack;
+    logic [7:0] tx_byte;
+    // Bit counter and shift register
+    logic [3:0] bit_cnt;
+    logic [7:0] tx_shift;
+    logic [7:0] rx_shift;
+    logic       slave_ack;
+    // SDA output drive
+    logic       sda_drive;
+    logic       sda_drive_en;
+    logic       tx_bit;
+    // SCL counter control
+    logic       scl_cnt_en_p1;
+    // Pop and load signals
+    logic       load_nxt;
+    // TX_ABRT source
+    logic       abrt_noack_addr;
+    logic       abrt_noack_data;
+    // FIFO lookahead
+    logic       more_writes_after_this;
+    logic       more_reads_after_this;
+    logic       will_restart_write_to_read;
+    logic       tx_fifo_has_more;
+
+    // ============================================================
     // HCNT/LCNT selection based on speed
     // ============================================================
-    logic [15:0] hcnt, lcnt;
     always_comb begin
         case (speed)
             2'b01: begin hcnt = {1'b0, ss_hcnt[14:0]}; lcnt = {1'b0, ss_lcnt[14:0]}; end
@@ -65,12 +125,6 @@ module i2c_master_fsm (
     // Generates scl_o: hcnt cycles high, lcnt cycles low, repeat
     // scl_o_idle = 1 (I2C idle = SCL high)
     // ============================================================
-    logic [15:0] scl_cnt;
-    logic        scl_cnt_en;
-    logic        scl_cnt_rst;
-    logic        in_high_phase;
-    logic        scl_o_int;
-
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             scl_cnt       <= '0;
@@ -87,8 +141,8 @@ module i2c_master_fsm (
                     in_high_phase <= 1'b1;
                     scl_o_int     <= 1'b1;
                 end else begin
-                    scl_cnt       <= scl_cnt + 1'b1;
-                    scl_o_int     <= 1'b0;
+                    scl_cnt   <= scl_cnt + 1'b1;
+                    scl_o_int <= 1'b0;
                 end
             end else begin
                 if (scl_cnt >= hcnt - 1) begin
@@ -96,8 +150,8 @@ module i2c_master_fsm (
                     in_high_phase <= 1'b0;
                     scl_o_int     <= 1'b0;
                 end else begin
-                    scl_cnt       <= scl_cnt + 1'b1;
-                    scl_o_int     <= 1'b1;
+                    scl_cnt   <= scl_cnt + 1'b1;
+                    scl_o_int <= 1'b1;
                 end
             end
         end else begin
@@ -112,50 +166,19 @@ module i2c_master_fsm (
     // ============================================================
     // SCL edge detection (using scl_o_int which is pclk-synchronous)
     // ============================================================
-    logic scl_prev;
-    logic scl_rising, scl_falling;
-
     always_ff @(posedge clk or negedge rst_n) begin
-        if (!rst_n) begin
+        if (!rst_n)
             scl_prev <= 1'b1;
-        end else begin
+        else
             scl_prev <= scl_o_int;
-        end
     end
 
     assign scl_rising  = (scl_prev == 1'b0) && (scl_o_int == 1'b1);
     assign scl_falling = (scl_prev == 1'b1) && (scl_o_int == 1'b0);
 
     // ============================================================
-    // FSM state
+    // Current CMD/DAT holding register
     // ============================================================
-    typedef enum logic [3:0] {
-        ST_IDLE       = 4'd0,
-        ST_START      = 4'd1,   // Generate START (SDA=0 while SCL=1)
-        ST_ADDR_BIT   = 4'd2,   // Send address+R/W bits (bit-by-bit)
-        ST_ADDR_ACK   = 4'd3,   // Receive addr ACK/NACK
-        ST_WDATA_BIT  = 4'd4,   // Send data bits
-        ST_WDATA_ACK  = 4'd5,   // Receive data ACK/NACK
-        ST_RDATA_BIT  = 4'd6,   // Receive data bits
-        ST_RDATA_ACK  = 4'd7,   // Send ACK/NACK after receive
-        ST_RESTART    = 4'd8,   // Repeated START
-        ST_STOP       = 4'd9    // Generate STOP
-    } state_t;
-    state_t state, next_state;
-
-    // ============================================================
-    // Current and next CMD/DAT holding registers
-    // ============================================================
-    logic       cur_cmd;       // 0=write, 1=read
-    logic [7:0] cur_dat;
-    logic       have_cur;      // cur_cmd/dat are valid
-
-    logic       nxt_cmd;
-    logic [7:0] nxt_dat;
-    logic       have_nxt;
-
-    // Peek at next CMD without consuming
-    logic       peek_cmd;
     assign peek_cmd = tx_cmd_peek;
 
     always_ff @(posedge clk or negedge rst_n) begin
@@ -169,15 +192,13 @@ module i2c_master_fsm (
         end else begin
             case (state)
                 ST_IDLE: begin
-                    // Load first CMD/DAT when transitioning out of IDLE
                     if (next_state != ST_IDLE && enable && master_mode) begin
-                        cur_cmd  <= tx_cmd_peek;   // peek CMD
+                        cur_cmd  <= tx_cmd_peek;
                         cur_dat  <= tx_dat_rdata;
                         have_cur <= 1'b1;
                     end
                 end
 
-                // Load next CMD/DAT at end of ACK phase
                 ST_ADDR_ACK, ST_WDATA_ACK, ST_RDATA_ACK: begin
                     if (scl_falling && (bit_cnt == 4'd9)) begin
                         if (have_nxt) begin
@@ -199,29 +220,19 @@ module i2c_master_fsm (
     // ============================================================
     // TX CMD/DAT FIFO pop (at end of byte transaction)
     // ============================================================
-    logic pop_at_ack;
-    logic [7:0] tx_byte;
-
-    // Address byte: TAR[6:0] + R/W
-    assign tx_byte = (state == ST_ADDR_BIT) ? {tar[6:0], cur_cmd} : cur_dat;
-
-    // Pop current CMD/DAT at ACK phase end
+    assign tx_byte    = (state == ST_ADDR_BIT) ? {tar[6:0], cur_cmd} : cur_dat;
     assign tx_cmd_pop = pop_at_ack;
     assign tx_dat_pop = pop_at_ack;
 
     // Load next CMD/DAT from FIFO into nxt_cmd/nxt_dat
-    // (done at the same ACK phase end)
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             have_nxt <= 1'b0;
             nxt_cmd  <= 1'b0;
             nxt_dat  <= 8'h0;
         end else begin
-            // Clear have_nxt when cur_cmd is consumed (pop_at_ack)
-            if (pop_at_ack) begin
+            if (pop_at_ack)
                 have_nxt <= 1'b0;
-            end
-            // Load next when FIFO has data
             if (load_nxt) begin
                 nxt_cmd  <= tx_cmd_peek;
                 nxt_dat  <= tx_dat_rdata;
@@ -233,11 +244,6 @@ module i2c_master_fsm (
     // ============================================================
     // Bit counter and shift register
     // ============================================================
-    logic [3:0] bit_cnt;
-    logic [7:0] tx_shift;
-    logic [7:0] rx_shift;
-    logic       slave_ack;      // 0=ACK, 1=NACK
-
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             bit_cnt    <= 4'd0;
@@ -255,10 +261,9 @@ module i2c_master_fsm (
                     bit_cnt <= 4'd0;
                 end
 
-                // Count bits on SCL falling edges
                 ST_ADDR_BIT: begin
                     if (scl_falling) begin
-                        tx_shift <= {tx_shift[6:0], 1'b0};  // MSB first
+                        tx_shift <= {tx_shift[6:0], 1'b0};
                         bit_cnt  <= bit_cnt + 1'b1;
                     end
                 end
@@ -295,13 +300,13 @@ module i2c_master_fsm (
                 ST_RDATA_BIT: begin
                     if (scl_rising) begin
                         rx_shift <= {rx_shift[6:0], sda_i_sync};
-                    end
-                    if (scl_falling) begin
-                        bit_cnt <= bit_cnt + 1'b1;
+                        bit_cnt  <= bit_cnt + 1'b1;
                     end
                 end
 
                 ST_RDATA_ACK: begin
+                    if (scl_rising && (bit_cnt == 4'd9))
+                        slave_ack <= sda_i_sync;
                     if (scl_falling) begin
                         if (bit_cnt < 4'd9)
                             bit_cnt <= bit_cnt + 1'b1;
@@ -318,11 +323,6 @@ module i2c_master_fsm (
     // ============================================================
     // SDA output drive
     // ============================================================
-    logic sda_drive;
-    logic sda_drive_en;
-
-    // MSB-first: which bit of tx_shift is on the wire?
-    logic tx_bit;
     always_comb begin
         if ((state == ST_ADDR_BIT) || (state == ST_WDATA_BIT))
             tx_bit = tx_shift[7];
@@ -337,7 +337,6 @@ module i2c_master_fsm (
             end
 
             ST_START: begin
-                // START: SDA=0 while SCL=1
                 sda_drive = 1'b0; sda_drive_en = 1'b1;
             end
 
@@ -345,24 +344,21 @@ module i2c_master_fsm (
                 sda_drive = tx_bit; sda_drive_en = 1'b1;
             end
 
-            // ACK bit (bit 8): drive ACK=0
             ST_ADDR_ACK, ST_WDATA_ACK: begin
                 sda_drive   = (bit_cnt == 4'd8) ? 1'b0 : 1'b1;
                 sda_drive_en = (bit_cnt >= 4'd8);
             end
 
-            // Release SDA for slave to drive during read
             ST_RDATA_BIT: begin
                 sda_drive = 1'b1; sda_drive_en = 1'b0;
             end
 
-            // ACK/NACK: ACK=0 (more reads), NACK=1 (last read)
             ST_RDATA_ACK: begin
                 if (bit_cnt == 4'd8) begin
                     if (more_reads_after_this)
-                        sda_drive = 1'b0;  // ACK: more data coming
+                        sda_drive = 1'b0;
                     else
-                        sda_drive = 1'b1;  // NACK: last byte
+                        sda_drive = 1'b1;
                 end else begin
                     sda_drive = 1'b1;
                 end
@@ -370,12 +366,10 @@ module i2c_master_fsm (
             end
 
             ST_RESTART: begin
-                // Repeated START: SDA=0 while SCL=1
                 sda_drive = 1'b0; sda_drive_en = 1'b1;
             end
 
             ST_STOP: begin
-                // STOP: drive SDA=0 first (then 0→1 transition at next SCL high)
                 sda_drive = 1'b0; sda_drive_en = 1'b1;
             end
 
@@ -391,7 +385,6 @@ module i2c_master_fsm (
     // ============================================================
     // SCL counter control
     // ============================================================
-    logic scl_cnt_en_p1;  // registered version
     always_comb begin
         case (state)
             ST_IDLE:    scl_cnt_en = 1'b0;
@@ -414,23 +407,19 @@ module i2c_master_fsm (
     // ============================================================
     // Pop and load signals
     // ============================================================
-    logic load_nxt;
-
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             pop_at_ack <= 1'b0;
-            load_nxt    <= 1'b0;
+            load_nxt   <= 1'b0;
         end else begin
             pop_at_ack <= 1'b0;
-            load_nxt    <= 1'b0;
+            load_nxt   <= 1'b0;
 
-            // At end of ACK phase: pop current, load next if available
             if (((state == ST_ADDR_ACK) || (state == ST_WDATA_ACK) || (state == ST_RDATA_ACK))
                 && scl_falling && (bit_cnt == 4'd9)) begin
                 pop_at_ack <= 1'b1;
-                if (!tx_cmd_empty && !tx_dat_empty) begin
+                if (!tx_cmd_empty && !tx_dat_empty)
                     load_nxt <= 1'b1;
-                end
             end
         end
     end
@@ -444,18 +433,15 @@ module i2c_master_fsm (
     // ============================================================
     // TX_ABRT source
     // ============================================================
-    // Combinational: which abort condition is active
-    logic abrt_noack_addr;
-    logic abrt_noack_data;
     assign abrt_noack_addr = (state == ST_ADDR_ACK) && scl_rising && (bit_cnt == 4'd9) && slave_ack;
     assign abrt_noack_data = (state == ST_WDATA_ACK) && scl_rising && (bit_cnt == 4'd9) && slave_ack;
 
     assign tx_abrt_source = {
         12'b0,
         abrt_noack_data,  // [3] ABRT_TXDATA_NOACK
-        1'b0, 1'b0,        // [2:1] 10-bit addr NACKs
+        1'b0, 1'b0,      // [2:1] 10-bit addr NACKs
         abrt_noack_addr,  // [0] ABRT_7B_NOACK
-        1'b0              // upper bits
+        1'b0
     };
 
     assign tx_abrt_set = abrt_noack_addr || abrt_noack_data;
@@ -469,29 +455,19 @@ module i2c_master_fsm (
         else if (!enable)
             state <= ST_IDLE;
         else if (abort)
-            state <= ST_STOP;  // Abort: send STOP
+            state <= ST_STOP;
         else
             state <= next_state;
     end
 
     // ============================================================
-    // Next CMD/Data lookahead (for decision making)
+    // FIFO lookahead
     // ============================================================
-    // In WDATA_BIT/WDATA_ACK: decide what to do after ACK
-    // In RDATA_BIT/RDATA_ACK: decide ACK vs NACK
-    logic more_writes_after_this;   // more CMD=0 after this byte
-    logic more_reads_after_this;    // more CMD=1 after this byte
-    logic will_restart_write_to_read;  // this byte CMD=0, next byte CMD=1
-    logic tx_fifo_has_more;         // at least one more CMD/DAT pair in FIFO
-
     assign tx_fifo_has_more = !tx_cmd_empty && !tx_dat_empty;
-
-    // Note: peek_cmd reflects the NEXT entry in TX CMD FIFO
-    // After current byte: if more data in FIFO, peek it
     assign more_writes_after_this  = tx_fifo_has_more && (peek_cmd == 1'b0);
     assign more_reads_after_this   = tx_fifo_has_more && (peek_cmd == 1'b1);
     assign will_restart_write_to_read = (have_nxt && (nxt_cmd == 1'b1)) ||
-                                          (!have_nxt && tx_fifo_has_more && (peek_cmd == 1'b1));
+                                        (!have_nxt && tx_fifo_has_more && (peek_cmd == 1'b1));
 
     // ============================================================
     // Next state logic
@@ -505,7 +481,7 @@ module i2c_master_fsm (
             end
 
             ST_START: begin
-                if (in_high_phase && (scl_cnt == '0))
+                if (in_high_phase && (scl_cnt == 16'b0))
                     next_state = ST_ADDR_BIT;
             end
 
@@ -516,13 +492,12 @@ module i2c_master_fsm (
 
             ST_ADDR_ACK: begin
                 if (scl_falling && (bit_cnt == 4'd9)) begin
-                    if (!slave_ack) begin
-                        next_state = ST_STOP;  // NACK: abort
-                    end else if (cur_cmd == 1'b0) begin
+                    if (!slave_ack)
+                        next_state = ST_STOP;
+                    else if (cur_cmd == 1'b0)
                         next_state = ST_WDATA_BIT;
-                    end else begin
+                    else
                         next_state = ST_RDATA_BIT;
-                    end
                 end
             end
 
@@ -533,15 +508,14 @@ module i2c_master_fsm (
 
             ST_WDATA_ACK: begin
                 if (scl_falling && (bit_cnt == 4'd9)) begin
-                    if (!slave_ack) begin
-                        next_state = ST_STOP;  // NACK
-                    end else if (more_writes_after_this) begin
-                        next_state = ST_WDATA_BIT;  // continue writing
-                    end else if (will_restart_write_to_read && restart_en) begin
-                        next_state = ST_RESTART;    // Write→Read: Repeated START
-                    end else begin
-                        next_state = ST_STOP;       // STOP
-                    end
+                    if (!slave_ack)
+                        next_state = ST_STOP;
+                    else if (more_writes_after_this)
+                        next_state = ST_WDATA_BIT;
+                    else if (will_restart_write_to_read && restart_en)
+                        next_state = ST_RESTART;
+                    else
+                        next_state = ST_STOP;
                 end
             end
 
@@ -552,16 +526,15 @@ module i2c_master_fsm (
 
             ST_RDATA_ACK: begin
                 if (scl_falling && (bit_cnt == 4'd9)) begin
-                    if (more_reads_after_this) begin
-                        next_state = ST_RDATA_BIT;  // more reads: ACK, continue
-                    end else begin
-                        next_state = ST_STOP;  // last read: NACK then STOP
-                    end
+                    if (more_reads_after_this)
+                        next_state = ST_RDATA_BIT;
+                    else
+                        next_state = ST_STOP;
                 end
             end
 
             ST_RESTART: begin
-                if (in_high_phase && (scl_cnt == '0))
+                if (in_high_phase && (scl_cnt == 16'b0))
                     next_state = ST_ADDR_BIT;
             end
 
@@ -575,10 +548,10 @@ module i2c_master_fsm (
     end
 
     // ============================================================
-    // Status signals
+    // Status and interrupt signals
     // ============================================================
     assign mst_activity = (state != ST_IDLE);
-    assign start_det = (state == ST_START) && in_high_phase && (scl_cnt == '0);
+    assign start_det = (state == ST_START) && in_high_phase && (scl_cnt == 16'b0);
     assign stop_det  = (state == ST_STOP)  && in_high_phase && (scl_cnt >= hcnt - 1);
 
-endmodule
+endmodule : i2c_master_fsm

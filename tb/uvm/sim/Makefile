@@ -13,14 +13,13 @@ UVM_FLAGS = +incdir+$(UVM_HOME) -uvm
 
 # Source files
 SRC_DIR = ../src
-RTL_DIR = ../../rtl
 TB_TOP = $(SRC_DIR)/tests/tb_top.sv
 
 # Filelist
 FILELIST = filelist.f
 
 # Test name (passed via command line: make sim TEST=test_name)
-TEST ?= test_master_single_write
+TEST ?= test_basic_master_single_write
 
 # Top-level module
 TOP = tb_top
@@ -47,9 +46,34 @@ help:
 	@echo "  make compile                - Compile only"
 	@echo "  make clean                 - Clean generated files"
 	@echo ""
-	@echo "Available tests:"
-	@echo "  test_master_single_write"
-	@echo "  test_master_single_read"
-	@echo "  test_master_burst_write"
-	@echo "  test_slave_receive"
-	@echo "  test_slave_transmit"
+	@echo "=== Basic Directed Tests (basic/) ==="
+	@echo "  test_basic_master_single_write     - Single byte write"
+	@echo "  test_basic_master_burst_write      - Burst write (8 bytes)"
+	@echo "  test_basic_master_single_read      - Single byte read"
+	@echo "  test_basic_master_burst_read       - Burst read (8 bytes)"
+	@echo "  test_basic_master_repeated_start   - Write then Read (Repeated START)"
+	@echo "  test_basic_master_addr_nack        - Address NACK, TX_ABRT detection"
+	@echo "  test_basic_master_data_nack        - Data NACK, TX_ABRT detection"
+	@echo "  test_basic_slave_receive           - Slave receives data"
+	@echo "  test_basic_slave_transmit          - Slave transmits data"
+	@echo "  test_basic_slave_addr_no_match     - Address mismatch, slave silent"
+	@echo ""
+	@echo "=== Interrupt Tests (interrupt/) ==="
+	@echo "  test_interrupt_rx_full             - RX_FULL interrupt"
+	@echo "  test_interrupt_tx_empty            - TX_EMPTY interrupt"
+	@echo "  test_interrupt_tx_abrt             - TX_ABRT interrupt sources"
+	@echo "  test_interrupt_stop_det            - STOP_DET interrupt"
+	@echo ""
+	@echo "=== Register Tests (reg/) ==="
+	@echo "  test_reg_con_write_read            - CON register all fields"
+	@echo "  test_reg_tar_sar                   - TAR/SAR registers"
+	@echo "  test_reg_hcnt_lcnt_speed           - HCNT/LCNT speed config"
+	@echo "  test_reg_enable_abort              - ENABLE/ABORT registers"
+	@echo "  test_reg_undefined_addr            - Undefined addr returns 0"
+	@echo ""
+	@echo "=== Constrained Random Tests (rand/) ==="
+	@echo "  test_rand_master_write             - Random data/addr/length"
+	@echo "  test_rand_master_read              - Random length/addr"
+	@echo "  test_rand_slave_receive            - Random data/length"
+	@echo "  test_rand_reg_access               - Random register sequence"
+	@echo "  test_rand_interrupt_mask           - Random interrupt mask combos"
