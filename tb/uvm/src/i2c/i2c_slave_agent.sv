@@ -6,6 +6,7 @@ class i2c_slave_agent extends uvm_driver #(i2c_transfer);
 
   virtual i2c_if vif;
   uvm_analysis_port #(i2c_transfer) ap;
+  uvm_sequencer #(i2c_transfer) sequencer;
 
   // Timing parameters
   real tperiod = 10us;
@@ -32,6 +33,12 @@ class i2c_slave_agent extends uvm_driver #(i2c_transfer);
     if (!uvm_config_db #(virtual i2c_if)::get(this, "", "vif", vif))
       `uvm_fatal("NOVIF", "i2c_slave_agent: virtual interface not set")
     ap = new("ap", this);
+    sequencer = uvm_sequencer #(i2c_transfer)::type_id::create("sequencer", this);
+  endfunction
+
+  function void connect_phase(uvm_phase phase);
+    super.connect_phase(phase);
+    seq_item_port.connect(sequencer.seq_item_export);
   endfunction
 
   // Drive ACK on SDA

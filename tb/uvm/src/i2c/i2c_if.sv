@@ -16,8 +16,6 @@ interface i2c_if ();
   wire sda_wire = sda_oe ? sda_o : 1'bz;
 
   // Weak pull-up simulation (when output enable is 0)
-  always begin
-    // Pull-up effect handled in driver/monitor
-  end
+  // Removed empty always block - was causing infinite loop hang
 
 endinterface : i2c_if
