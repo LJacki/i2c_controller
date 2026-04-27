@@ -1,4 +1,5 @@
 // I2C Transaction
+import uvm_pkg::*;
 class i2c_transfer extends uvm_sequence_item;
 
   typedef enum { I2C_WRITE, I2C_READ } i2c_kind_e;

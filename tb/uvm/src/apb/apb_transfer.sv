@@ -1,4 +1,5 @@
 // APB Transaction
+import uvm_pkg::*;
 class apb_transfer extends uvm_sequence_item;
 
   typedef enum { APB_READ, APB_WRITE } apb_kind_e;

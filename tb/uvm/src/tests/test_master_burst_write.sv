@@ -9,7 +9,6 @@ class test_master_burst_write extends base_test;
   endfunction
 
   task run_phase(uvm_phase phase);
-      bit [7:0] data_byte = 8'hA0 + i;
     phase.raise_objection(this);
     `uvm_info("TEST_MASTER_BURST_WRITE", "Starting Master Burst Write Test (8 bytes)...", UVM_MEDIUM)
 
@@ -21,6 +20,7 @@ class test_master_burst_write extends base_test;
 
     // Write 8 bytes (CMD=0 for each)
     for (int i = 0; i < 8; i++) begin
+      bit [7:0] data_byte = 8'hA0 + i;
       apb_write(8'h0C, {24'b0, data_byte});
       #5us;  // small delay between writes
     end
