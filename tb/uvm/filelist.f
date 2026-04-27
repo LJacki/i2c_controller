@@ -13,4 +13,3 @@ tb/uvm/src/i2c_ctrl_pkg.sv
 tb/uvm/src/tests/tb_top.sv
 
 # RTL Stub
-rtl/i2c_ctrl_top.sv

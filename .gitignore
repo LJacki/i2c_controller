@@ -1,0 +1,7 @@
+sim/
+csrc/
+*.log
+*.key
+ucli.key
+DVEfiles/
+vc_hdrs.h
