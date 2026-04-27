@@ -102,11 +102,7 @@ module i2c_slave_fsm (
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             rx_shift_reg   <= 8'h0;
-            tx_shift_reg   <= 8'h0;
             bit_cnt        <= 4'd0;
-            rx_addr_valid  <= 1'b0;
-            received_addr  <= 7'h0;
-            received_rw    <= 1'b0;
         end else begin
             case (state)
                 S_IDLE: begin
@@ -149,7 +145,6 @@ module i2c_slave_fsm (
                 S_RDATA: begin
                     // Shift out TX data on SCL falling edge
                     if (scl_falling) begin
-                        tx_shift_reg <= {tx_shift_reg[6:0], 1'b0};
                         if (bit_cnt < 4'd8) begin
                             bit_cnt <= bit_cnt + 1'b1;
                         end
@@ -340,15 +335,19 @@ module i2c_slave_fsm (
         end
     end
 
-    // Load TX shift register from TX DAT FIFO when entering RDATA
+    // Load TX shift register from TX DAT FIFO when entering RDATA, then shift
     always_ff @(posedge clk or negedge rst_n) begin
         if (!rst_n) begin
             tx_shift_reg <= 8'h0;
-        end else if (state == S_RDATA && bit_cnt == 4'd0) begin
-            if (!tx_dat_empty)
-                tx_shift_reg <= tx_dat_rdata;
-            else
-                tx_shift_reg <= 8'h00;  // TX FIFO empty: send 0x00
+        end else if (state == S_RDATA) begin
+            if (bit_cnt == 4'd0) begin
+                if (!tx_dat_empty)
+                    tx_shift_reg <= tx_dat_rdata;
+                else
+                    tx_shift_reg <= 8'h00;
+            end else if (scl_falling) begin
+                tx_shift_reg <= {tx_shift_reg[6:0], 1'b0};
+            end
         end
     end
 

@@ -186,9 +186,6 @@ module i2c_master_fsm (
             cur_cmd  <= 1'b0;
             cur_dat  <= 8'h0;
             have_cur <= 1'b0;
-            nxt_cmd  <= 1'b0;
-            nxt_dat  <= 8'h0;
-            have_nxt <= 1'b0;
         end else begin
             case (state)
                 ST_IDLE: begin
@@ -205,7 +202,6 @@ module i2c_master_fsm (
                             cur_cmd  <= nxt_cmd;
                             cur_dat  <= nxt_dat;
                             have_cur <= 1'b1;
-                            have_nxt <= 1'b0;
                         end else begin
                             have_cur <= 1'b0;
                         end
@@ -231,9 +227,9 @@ module i2c_master_fsm (
             nxt_cmd  <= 1'b0;
             nxt_dat  <= 8'h0;
         end else begin
-            if (pop_at_ack)
+            if (pop_at_ack) begin
                 have_nxt <= 1'b0;
-            if (load_nxt) begin
+            end else if (load_nxt) begin
                 nxt_cmd  <= tx_cmd_peek;
                 nxt_dat  <= tx_dat_rdata;
                 have_nxt <= 1'b1;
