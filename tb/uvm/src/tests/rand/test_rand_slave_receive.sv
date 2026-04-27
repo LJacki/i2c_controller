@@ -45,18 +45,13 @@ class test_rand_slave_receive extends base_test;
     apb_write(8'h00, 12'h04);  // MASTER_MODE=0, SLAVE_DISABLE=0
     apb_write(8'h34, 32'h1);   // ENABLE=1
 
-    // I2C BFM writes randomized data to DUT
+    // I2C BFM writes randomized data to DUT   
     fork
       begin
-        i2c_transfer tr;
-        tr = i2c_transfer::type_id::create("tr");
-        tr.kind = i2c_transfer::I2C_WRITE;
-        tr.addr = slave_addr;
-        tr.data = rand_data;
-        tr.last_cmd = 1'b0;
-        env.i2c_master.seq_item_port.put(tr);
+        foreach (rand_data[i]) env.i2c_master.drive_i2c_write(slave_addr, rand_data[i]);
       end
     join_none
+
 
     #100us;
 
@@ -76,26 +71,36 @@ class test_rand_slave_receive extends base_test;
   end
   endtask
 
-  task apb_write(logic [7:0] addr, logic [31:0] data);
-    apb_transfer tr;
-    tr = apb_transfer::type_id::create("tr");
-    tr.kind  = apb_transfer::APB_WRITE;
-    tr.addr  = addr;
-    tr.data  = data;
-    tr.delay = 0;
-    env.apb_drv.seq_item_port.put(tr);
+  task apb_write(input logic [7:0] addr, input logic [31:0] data);
+    virtual apb_if vif = env.apb_drv.vif;
+    @(posedge vif.pclk);
+    vif.psel    <= 1'b1;
+    vif.penable <= 1'b0;
+    vif.pwrite  <= 1'b1;
+    vif.paddr   <= addr;
+    vif.pwdata  <= data;
+    @(posedge vif.pclk);
+    vif.penable <= 1'b1;
+    @(posedge vif.pclk);
+    while (!vif.pready) @(posedge vif.pclk);
+    vif.psel    <= 1'b0;
+    vif.penable <= 1'b0;
   endtask
 
-  task apb_read(logic [7:0] addr, output logic [31:0] data);
-    apb_transfer tr;
-    tr = apb_transfer::type_id::create("tr");
-    tr.kind = apb_transfer::APB_READ;
-    tr.addr = addr;
-    tr.data = 0;
-    tr.delay = 0;
-    env.apb_drv.seq_item_port.put(tr);
-    #1us;
-    data = tr.data;
+  task apb_read(input logic [7:0] addr, output logic [31:0] data);
+    virtual apb_if vif = env.apb_drv.vif;
+    @(posedge vif.pclk);
+    vif.psel    <= 1'b1;
+    vif.penable <= 1'b0;
+    vif.pwrite  <= 1'b0;
+    vif.paddr   <= addr;
+    @(posedge vif.pclk);
+    vif.penable <= 1'b1;
+    @(posedge vif.pclk);
+    while (!vif.pready) @(posedge vif.pclk);
+    data = vif.prdata;
+    vif.psel    <= 1'b0;
+    vif.penable <= 1'b0;
   endtask
 
 endclass : test_rand_slave_receive

@@ -21,13 +21,7 @@ class test_slave_receive extends base_test;
     // I2C BFM initiates write transaction to DUT
     fork
       begin
-        i2c_transfer tr;
-        tr = i2c_transfer::type_id::create("tr");
-        tr.kind = i2c_transfer::I2C_WRITE;
-        tr.addr = 7'h3C;
-        tr.data = '{8'hBB};
-        tr.last_cmd = 1'b0;
-        env.i2c_master.seq_item_port.put(tr);
+        env.i2c_master.drive_i2c_write(7'h3C, '{8'hBB});
       end
     join
 
@@ -37,14 +31,20 @@ class test_slave_receive extends base_test;
     phase.drop_objection(this);
   endtask
 
-  task apb_write(bit [7:0] addr, bit [31:0] data);
-    apb_transfer tr;
-    tr = apb_transfer::type_id::create("tr");
-    tr.kind  = apb_transfer::APB_WRITE;
-    tr.addr  = addr;
-    tr.data  = data;
-    tr.delay = 0;
-    env.apb_drv.seq_item_port.put(tr);
+  task apb_write(input logic [7:0] addr, input logic [31:0] data);
+    virtual apb_if vif = env.apb_drv.vif;
+    @(posedge vif.pclk);
+    vif.psel    <= 1'b1;
+    vif.penable <= 1'b0;
+    vif.pwrite  <= 1'b1;
+    vif.paddr   <= addr;
+    vif.pwdata  <= data;
+    @(posedge vif.pclk);
+    vif.penable <= 1'b1;
+    @(posedge vif.pclk);
+    while (!vif.pready) @(posedge vif.pclk);
+    vif.psel    <= 1'b0;
+    vif.penable <= 1'b0;
   endtask
 
 endclass : test_slave_receive

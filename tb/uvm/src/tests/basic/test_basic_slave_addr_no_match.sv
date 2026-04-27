@@ -28,13 +28,7 @@ class test_basic_slave_addr_no_match extends base_test;
     // I2C BFM sends wrong address (0x55, not 0x3C)
     fork
       begin
-        i2c_transfer tr;
-        tr = i2c_transfer::type_id::create("tr");
-        tr.kind = i2c_transfer::I2C_WRITE;
-        tr.addr = 7'h55;  // Wrong address
-        tr.data = '{8'hEE};
-        tr.last_cmd = 1'b0;
-        env.i2c_master.seq_item_port.put(tr);
+        env.i2c_master.drive_i2c_write(7'h55, 8'hEE);
       end
     join_none
 
@@ -53,26 +47,36 @@ class test_basic_slave_addr_no_match extends base_test;
   end
   endtask
 
-  task apb_write(logic [7:0] addr, logic [31:0] data);
-    apb_transfer tr;
-    tr = apb_transfer::type_id::create("tr");
-    tr.kind  = apb_transfer::APB_WRITE;
-    tr.addr  = addr;
-    tr.data  = data;
-    tr.delay = 0;
-    env.apb_drv.seq_item_port.put(tr);
+  task apb_write(input logic [7:0] addr, input logic [31:0] data);
+    virtual apb_if vif = env.apb_drv.vif;
+    @(posedge vif.pclk);
+    vif.psel    <= 1'b1;
+    vif.penable <= 1'b0;
+    vif.pwrite  <= 1'b1;
+    vif.paddr   <= addr;
+    vif.pwdata  <= data;
+    @(posedge vif.pclk);
+    vif.penable <= 1'b1;
+    @(posedge vif.pclk);
+    while (!vif.pready) @(posedge vif.pclk);
+    vif.psel    <= 1'b0;
+    vif.penable <= 1'b0;
   endtask
 
-  task apb_read(logic [7:0] addr, output logic [31:0] data);
-    apb_transfer tr;
-    tr = apb_transfer::type_id::create("tr");
-    tr.kind = apb_transfer::APB_READ;
-    tr.addr = addr;
-    tr.data = 0;
-    tr.delay = 0;
-    env.apb_drv.seq_item_port.put(tr);
-    #1us;
-    data = tr.data;
+  task apb_read(input logic [7:0] addr, output logic [31:0] data);
+    virtual apb_if vif = env.apb_drv.vif;
+    @(posedge vif.pclk);
+    vif.psel    <= 1'b1;
+    vif.penable <= 1'b0;
+    vif.pwrite  <= 1'b0;
+    vif.paddr   <= addr;
+    @(posedge vif.pclk);
+    vif.penable <= 1'b1;
+    @(posedge vif.pclk);
+    while (!vif.pready) @(posedge vif.pclk);
+    data = vif.prdata;
+    vif.psel    <= 1'b0;
+    vif.penable <= 1'b0;
   endtask
 
 endclass : test_basic_slave_addr_no_match
