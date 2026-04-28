@@ -154,14 +154,13 @@ module i2c_master_fsm (
                     scl_o_int <= 1'b1;
                 end
             end
-        end else begin
-            scl_o_int     <= 1'b1;
-            in_high_phase <= 1'b1;
         end
+        // Note: when scl_cnt_en=0, scl_o_int HOLDS its value (no forced assignment)
+        // This allows SCL to maintain proper level when counter is disabled
     end
 
     assign scl_o  = scl_o_int;
-    assign scl_oe = scl_cnt_en && enable && master_mode;
+    assign scl_oe = scl_cnt_en && enable && master_mode && !in_high_phase;
 
     // ============================================================
     // SCL edge detection (using scl_o_int which is pclk-synchronous)
@@ -477,7 +476,9 @@ module i2c_master_fsm (
             end
 
             ST_START: begin
-                if (in_high_phase && (scl_cnt == 16'b0))
+                // Wait for full high phase duration (hcnt cycles) before driving SDA low
+                // This ensures SCL is high when SDA falls (START condition per I2C spec)
+                if (in_high_phase && (scl_cnt >= (hcnt[15:0] - 1)))
                     next_state = ST_ADDR_BIT;
             end
 
