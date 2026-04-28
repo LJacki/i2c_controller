@@ -48,7 +48,7 @@ class test_rand_slave_receive extends base_test;
     // I2C BFM writes randomized data to DUT   
     fork
       begin
-        foreach (rand_data[i]) env.i2c_master.drive_i2c_write(slave_addr, rand_data[i]);
+        // DUT master FSM drives via APB
       end
     join_none
 

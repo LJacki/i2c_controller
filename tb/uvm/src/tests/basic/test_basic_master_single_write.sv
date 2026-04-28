@@ -38,37 +38,45 @@ class test_basic_master_single_write extends base_test;
   end
   endtask
 
-  // Direct APB write - test drives signals directly through env's APB interface
+  // Fixed APB write - proper APB protocol with SETUP then ACCESS phase
   task apb_write(input logic [7:0] addr, input logic [31:0] data);
     virtual apb_if vif = env.apb_drv.vif;
+    // SETUP phase: psel=1, penable=0, drive address and data
     @(posedge vif.pclk);
-    vif.psel    <= 1'b1;
-    vif.penable <= 1'b0;
-    vif.pwrite  <= 1'b1;
-    vif.paddr   <= addr;
-    vif.pwdata  <= data;
+    vif.psel    = 1'b1;
+    vif.penable = 1'b0;
+    vif.pwrite  = 1'b1;
+    vif.paddr   = addr;
+    vif.pwdata  = data;
+    // ACCESS phase: penable=1, address and data must be stable
     @(posedge vif.pclk);
-    vif.penable <= 1'b1;
+    vif.penable = 1'b1;
+    // Wait for slave to respond
     @(posedge vif.pclk);
     while (!vif.pready) @(posedge vif.pclk);
-    vif.psel    <= 1'b0;
-    vif.penable <= 1'b0;
+    // Return to IDLE: penable=0, then psel=0
+    @(posedge vif.pclk);
+    vif.penable = 1'b0;
+    vif.psel    = 1'b0;
   endtask
 
   task apb_read(input logic [7:0] addr, output logic [31:0] data);
     virtual apb_if vif = env.apb_drv.vif;
+    // SETUP phase
     @(posedge vif.pclk);
-    vif.psel    <= 1'b1;
-    vif.penable <= 1'b0;
-    vif.pwrite  <= 1'b0;
-    vif.paddr   <= addr;
+    vif.psel    = 1'b1;
+    vif.penable = 1'b0;
+    vif.pwrite  = 1'b0;
+    vif.paddr   = addr;
+    // ACCESS phase
     @(posedge vif.pclk);
-    vif.penable <= 1'b1;
+    vif.penable = 1'b1;
     @(posedge vif.pclk);
     while (!vif.pready) @(posedge vif.pclk);
     data = vif.prdata;
-    vif.psel    <= 1'b0;
-    vif.penable <= 1'b0;
+    @(posedge vif.pclk);
+    vif.penable = 1'b0;
+    vif.psel    = 1'b0;
   endtask
 
 endclass : test_basic_master_single_write

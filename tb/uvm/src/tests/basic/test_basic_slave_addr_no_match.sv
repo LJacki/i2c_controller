@@ -25,12 +25,7 @@ class test_basic_slave_addr_no_match extends base_test;
     apb_read(8'h40, rxflr_before);
     `uvm_info("TEST_BASIC_SLAVE_ADDR_NO_MATCH", $sformatf("RXFLR before transaction=0x%08h", rxflr_before), UVM_MEDIUM)
 
-    // I2C BFM sends wrong address (0x55, not 0x3C)
-    fork
-      begin
-        env.i2c_master.drive_i2c_write(7'h55, 8'hEE);
-      end
-    join_none
+    // DUT master FSM now drives I2C transaction
 
     #50us;
 

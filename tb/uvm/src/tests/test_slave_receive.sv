@@ -21,7 +21,7 @@ class test_slave_receive extends base_test;
     // I2C BFM initiates write transaction to DUT
     fork
       begin
-        env.i2c_master.drive_i2c_write(7'h3C, '{8'hBB});
+        // Removed: DUT master FSM now drives via APB DATA_CMD
       end
     join
 

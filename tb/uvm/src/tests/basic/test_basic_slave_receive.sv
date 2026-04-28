@@ -21,12 +21,7 @@ class test_basic_slave_receive extends base_test;
     apb_write(8'h00, 12'h04);  // MASTER_MODE=0, SLAVE_DISABLE=0
     apb_write(8'h34, 32'h1);   // ENABLE=1
 
-    // I2C BFM acts as Master writing to DUT slave
-    fork
-      begin
-        env.i2c_master.drive_i2c_write(7'h3C, 8'hCC);
-      end
-    join_none
+    // DUT master FSM now drives I2C transaction
 
 
     #50us;

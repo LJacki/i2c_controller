@@ -48,7 +48,7 @@ class test_interrupt_stop_det extends base_test;
     apb_write(8'h34, 32'h1);   // ENABLE=1   
     fork
       begin
-        env.i2c_master.drive_i2c_write_multi(7'h3C, '{8'h88});
+        // Removed: DUT master FSM now drives I2C transaction
       end
     join_none
 

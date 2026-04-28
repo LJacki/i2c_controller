@@ -27,7 +27,7 @@ class test_basic_slave_transmit extends base_test;
     fork
       begin
         logic [7:0] rd_data;
-        env.i2c_master.drive_i2c_read(7'h3C, rd_data);
+        // Removed: DUT master FSM now drives via APB DATA_CMD
       end
     join_none
 

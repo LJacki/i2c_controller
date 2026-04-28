@@ -1,0 +1,25 @@
+Design Hierarchy
+
+
+----------------
+SCORE  LINE   COND   TOGGLE FSM    BRANCH        
+ 18.28  43.07  13.74   5.58   0.00  29.03 tb_top 
+  
+  ----------------
+  SCORE  LINE   COND   TOGGLE FSM    BRANCH             
+   30.13 --     --      30.13 --     --     apb_if_inst 
+   17.33  40.84  12.79   4.71   0.00  28.33 dut         
+    
+    ----------------
+    SCORE  LINE   COND   TOGGLE FSM    BRANCH               
+     30.22  57.14  30.43   4.02 --      29.27 u_apb_reg     
+     11.90  31.11   7.41   0.60   0.00  20.39 u_master_fsm  
+     38.64  66.67  21.43   3.95 --      62.50 u_rx_fifo     
+     12.31  32.22   5.06   1.70   0.00  22.58 u_slave_fsm   
+     40.07  66.67  27.27   3.85 --      62.50 u_tx_cmd_fifo 
+     44.85  66.67  27.27  22.97 --      62.50 u_tx_dat_fifo 
+  
+  ----------------
+  SCORE  LINE   COND   TOGGLE FSM    BRANCH             
+   33.33 --      50.00   0.00 --      50.00 i2c_if_inst 
+

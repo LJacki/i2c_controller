@@ -1,0 +1,28 @@
+Dashboard
+
+Date: Tue Apr 28 12:02:58 2026
+
+User: xiaoai
+
+Version: O-2018.09-SP2
+Command line: urg -format text -dir sim/simv.vdb -report merge_report 
+
+Number of tests: 1
+
+-------------------------------------------------------------------------------
+Total Coverage Summary 
+SCORE  LINE   COND   TOGGLE FSM    BRANCH 
+ 18.28  43.07  13.74   5.58   0.00  29.03 
+
+
+-------------------------------------------------------------------------------
+Hierarchical coverage data for top-level instances 
+SCORE  LINE   COND   TOGGLE FSM    BRANCH NAME   
+ 18.28  43.07  13.74   5.58   0.00  29.03 tb_top 
+
+
+-------------------------------------------------------------------------------
+Total Module Definition Coverage Summary 
+SCORE  LINE   COND   TOGGLE FSM    BRANCH 
+ 18.28  43.07  13.74   5.58   0.00  29.03 
+

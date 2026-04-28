@@ -18,6 +18,8 @@ package i2c_ctrl_pkg;
   `include "i2c/i2c_transfer.sv"
   `include "i2c/i2c_master_agent.sv"
   `include "i2c/i2c_slave_agent.sv"
+  `include "i2c/i2c_bus_monitor.sv"
+  `include "i2c/i2c_protocol_checker.sv"
 
   // Environment
   `include "env/scoreboard.sv"

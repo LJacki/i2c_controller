@@ -78,9 +78,21 @@ module tb_top;
     uvm_config_db #(virtual apb_if)::set(null, "uvm_test_top.env.apb_mon", "vif", apb_if_inst);
     uvm_config_db #(virtual i2c_if)::set(null, "uvm_test_top.env.i2c_master", "vif", i2c_if_inst);
     uvm_config_db #(virtual i2c_if)::set(null, "uvm_test_top.env.i2c_slave", "vif", i2c_if_inst);
+    uvm_config_db #(virtual i2c_if)::set(null, "uvm_test_top.env.i2c_bus_mon", "vif", i2c_if_inst);
+    uvm_config_db #(virtual i2c_if)::set(null, "uvm_test_top.env.i2c_proto_chk", "vif", i2c_if_inst);
 
     // Run test
     run_test();
+  end
+
+  // Debug monitor for I2C bus activity
+  initial begin
+    forever begin
+      @(posedge i2c_if_inst.scl_o);
+      if (i2c_if_inst.sda_o === 1'b0 && i2c_if_inst.scl_o === 1'b0) begin
+        $display("[I2C_DBG %t] START detected: scl_o=%b, sda_o=%b", $time, i2c_if_inst.scl_o, i2c_if_inst.sda_o);
+      end
+    end
   end
 
 endmodule : tb_top
