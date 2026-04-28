@@ -1,0 +1,116 @@
+# Verdi RC - I2C Controller 信号分组
+# 使用方法: verdi -f rtl/filelist.f -ssverilog -input verdi.rc &
+# 或直接: verdi sim/wave.vcd -input verdi.rc &
+
+# ============================================================
+# 信号分组定义
+# ============================================================
+
+# APB 接口
+defn ug "APB_IF" {
+    apb_if_inst.pclk
+    apb_if_inst.presetn
+    apb_if_inst.psel
+    apb_if_inst.penable
+    apb_if_inst.pwrite
+    apb_if_inst.paddr[7:0]
+    apb_if_inst.pwdata[31:0]
+    apb_if_inst.prdata[31:0]
+    apb_if_inst.pready
+}
+
+# I2C 物理引脚 (TB top level)
+defn ug "I2C_PINS" {
+    tb_top.scl_i
+    tb_top.scl_o
+    tb_top.scl_oe
+    tb_top.sda_i
+    tb_top.sda_o
+    tb_top.sda_oe
+    tb_top.intr
+}
+
+# Master FSM 状态机核心
+defn ug "FSM_STATE" {
+    dut.u_master_fsm.state
+    dut.u_master_fsm.next_state
+    dut.u_master_fsm.enable
+    dut.u_master_fsm.master_mode
+}
+
+# FSM I2C 控制信号
+defn ug "FSM_CTRL" {
+    dut.u_master_fsm.scl_oe
+    dut.u_master_fsm.sda_oe
+    dut.u_master_fsm.scl_o
+    dut.u_master_fsm.sda_o
+    dut.u_master_fsm.tx_cmd_empty
+    dut.u_master_fsm.tx_dat_empty
+}
+
+# FSM 计数器
+defn ug "FSM_CNT" {
+    dut.u_master_fsm.scl_cnt[15:0]
+    dut.u_master_fsm.bit_cnt[3:0]
+    dut.u_master_fsm.hcnt[15:0]
+    dut.u_master_fsm.lcnt[15:0]
+    dut.u_master_fsm.tx_bit
+    dut.u_master_fsm.tx_byte[7:0]
+}
+
+# APB 关键配置寄存器
+defn ug "APB_CFG" {
+    dut.u_apb_reg.enable
+    dut.u_apb_reg.master_mode
+    dut.u_apb_reg.speed[1:0]
+    dut.u_apb_reg.ic_tar[10:0]
+    dut.u_apb_reg.ic_sar[6:0]
+    dut.u_apb_reg.ss_hcnt[15:0]
+    dut.u_apb_reg.ss_lcnt[15:0]
+    dut.u_apb_reg.fs_hcnt[15:0]
+    dut.u_apb_reg.fs_lcnt[15:0]
+}
+
+# APB FIFO 状态
+defn ug "APB_FIFO" {
+    dut.u_apb_reg.txflr[4:0]
+    dut.u_apb_reg.rxflr[4:0]
+    dut.u_apb_reg.tfe
+    dut.u_apb_reg.rfne
+}
+
+# 中断与 Abort 状态
+defn ug "INT_ABRT" {
+    dut.u_apb_reg.ic_tx_abrt_source[15:0]
+    dut.u_apb_reg.ic_raw_intr_stat[11:0]
+    dut.u_apb_reg.ic_enable
+    dut.u_apb_reg.intr[10:0]
+    dut.u_master_fsm.tx_abrt_source[15:0]
+}
+
+# I2C 总线活动 (最常用调试视图)
+defn ug "I2C_ACTIVITY" {
+    tb_top.scl_oe
+    tb_top.sda_oe
+    tb_top.scl_i
+    tb_top.sda_i
+    dut.u_master_fsm.state
+}
+
+# ============================================================
+# 加载所有信号组
+# ============================================================
+add list -hierarchy -group APB_IF
+add list -hierarchy -group I2C_PINS
+add list -hierarchy -group FSM_STATE
+add list -hierarchy -group FSM_CTRL
+add list -hierarchy -group FSM_CNT
+add list -hierarchy -group APB_CFG
+add list -hierarchy -group APB_FIFO
+add list -hierarchy -group INT_ABRT
+add list -hierarchy -group I2C_ACTIVITY
+
+# ============================================================
+# 窗口布局
+# ============================================================
+; 打开 Signal Group 面板
