@@ -1,16 +1,17 @@
 #!/bin/bash
 # I2C Controller VCS build + run script
 # Usage:
-#   make compile                                    # compile only
-#   make run TEST=test_basic_master_single_write     # compile + run with auto-timeout
-#   make simv TEST=test_basic_master_single_write   # run already-compiled simv
+#   bash tools/run_vcs.sh compile                          # compile only
+#   bash tools/run_vcs.sh run test_basic_master_single_write  # compile + run with auto-timeout
 
 PROJECT_ROOT=/home/xiaoai/Desktop/disk1/IC_Project/i2c_controller
 cd "$PROJECT_ROOT"
 source /home/xiaoai/synopsys_env_setup.sh
-export VCS_HOME=/eda/synopsys/vcs/O-2018.09-SP2/vcs/O-2018.09-SP2
+
+# Runtime: use g++ wrapper to inject -L (for link-time pthread_yield)
 export PATH=$HOME/bin:$VCS_HOME/bin:$PATH
-export LD_PRELOAD=$HOME/lib64_compat/libpthread_override.so
+# Compile: unset LD_PRELOAD to avoid VCS tool crashes (pthread_yield via g++ wrapper)
+unset LD_PRELOAD
 
 # ============================================================
 # Timeout estimation based on test name patterns
@@ -62,19 +63,20 @@ do_run() {
     local logfile="sim/${test}.log"
 
     if [ ! -x sim/simv ]; then
-        echo "ERROR: sim/simv not found. Run 'make compile' first."
+        echo "ERROR: sim/simv not found. Run 'do_compile' first."
         return 1
     fi
 
     echo "=== Running $test (timeout=${timeout}s) ==="
     echo "Start: $(date)"
 
+    # Runtime: LD_LIBRARY_PATH so loader finds libpthread.so (symlink to thin stub)
     cd sim
-    timeout $timeout ./simv \
+    LD_LIBRARY_PATH=$HOME/lib64_compat:$LD_LIBRARY_PATH \
+        timeout $timeout ./simv \
         +vcs+lic+wait \
         +UVM_TESTNAME=$test \
         -l "$logfile"
-
     local status=$?
     cd ..
 
@@ -86,7 +88,7 @@ do_run() {
         echo "Simulation completed normally"
     fi
     echo "End: $(date) - exit $status"
-    return 0  # 始终返回 0，避免 make 因非零退出码中断
+    return 0
 }
 
 # ============================================================
@@ -100,10 +102,6 @@ case "$ACTION" in
         do_compile
         ;;
     run)
-        do_run "$TESTNAME"
-        ;;
-    simv)
-        # 单独运行 simv（假设已编译）
         do_run "$TESTNAME"
         ;;
     *)

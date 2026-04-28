@@ -105,7 +105,14 @@ module tb_top;
   end
 
   // UVM run task
+  
+  // VCD waveform dump for Verdi/Open.vat
   initial begin
+    $dumpfile("sim/wave.vcd");
+    $dumpvars(0, tb_top);
+    $dumpon;
+  end
+initial begin
     uvm_config_db #(virtual apb_if)::set(null, "uvm_test_top.env.apb_drv", "vif", apb_if_inst);
     uvm_config_db #(virtual apb_if)::set(null, "uvm_test_top.env.apb_mon", "vif", apb_if_inst);
     uvm_config_db #(virtual i2c_if)::set(null, "uvm_test_top.env.i2c_master", "vif", i2c_if_inst);
