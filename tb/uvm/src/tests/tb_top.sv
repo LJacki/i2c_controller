@@ -47,11 +47,7 @@ module tb_top;
     presetn = 1;
   end
 
-  // I2C wire resolution (multiple drivers via assign - tri-state behavior)
-  assign scl_i = (scl_oe) ? scl_o : 1'b1;  // pull-up when OE=0
-  assign sda_i = (sda_oe) ? sda_o : 1'b1;  // pull-up when OE=0
-
-  // DUT instantiation
+  // DUT instantiation - connect to i2c_if signals
   i2c_ctrl_top dut (
     .pclk(pclk),
     .presetn(presetn),
@@ -62,14 +58,77 @@ module tb_top;
     .pwdata(apb_if_inst.pwdata),
     .prdata(apb_if_inst.prdata),
     .pready(apb_if_inst.pready),
-    .scl_i(scl_i),
-    .scl_o(scl_o),
-    .scl_oe(scl_oe),
-    .sda_i(sda_i),
-    .sda_o(sda_o),
-    .sda_oe(sda_oe),
+    .scl_i(i2c_if_inst.scl_i),
+    .scl_o(i2c_if_inst.scl_o),
+    .scl_oe(i2c_if_inst.scl_oe),
+    .sda_i(i2c_if_inst.sda_i),
+    .sda_o(i2c_if_inst.sda_o),
+    .sda_oe(i2c_if_inst.sda_oe),
     .intr(intr)
   );
+
+  // ========================
+  // Bus Activity Monitor
+  // ========================
+  bit prev_scl_oe = 1'bx;
+  bit prev_sda_oe = 1'bx;
+  bit prev_scl_i = 1'b1;
+  bit prev_sda_i = 1'b1;
+  int scl_oe_changes = 0;
+  int sda_oe_changes = 0;
+  integer mon_fd;
+
+  initial begin
+    mon_fd = $fopen("/tmp/i2c_bus_activity.log", "w");
+    $fwrite(mon_fd, "Time(ns), Event, scl_oe, scl_i, sda_oe, sda_i\n");
+  end
+
+  always @(posedge pclk) begin
+    if (presetn) begin
+      // Monitor scl_oe changes (master driving SCL low)
+      if (scl_oe !== prev_scl_oe) begin
+        $fwrite(mon_fd, "%t, scl_oe=%b->%b, scl_i=%b, sda_oe=%b, sda_i=%b\n",
+                $time, prev_scl_oe, scl_oe, i2c_if_inst.scl_i, sda_oe, i2c_if_inst.sda_i);
+        $display("BUS: time=%t scl_oe=%b scl_i=%b sda_oe=%b sda_i=%b [changes=%0d]",
+                 $time, scl_oe, i2c_if_inst.scl_i, sda_oe, i2c_if_inst.sda_i, scl_oe_changes);
+        prev_scl_oe = scl_oe;
+        scl_oe_changes++;
+      end
+      // Monitor sda_oe changes
+      if (sda_oe !== prev_sda_oe) begin
+        $fwrite(mon_fd, "%t, sda_oe=%b->%b, scl_oe=%b, scl_i=%b, sda_i=%b\n",
+                $time, prev_sda_oe, sda_oe, scl_oe, i2c_if_inst.scl_i, i2c_if_inst.sda_i);
+        prev_sda_oe = sda_oe;
+        sda_oe_changes++;
+      end
+      // Detect START: SDA falls while SCL=1
+      if (prev_sda_i === 1'b1 && i2c_if_inst.sda_i === 1'b0 && i2c_if_inst.scl_i === 1'b1) begin
+        $fwrite(mon_fd, "%t, START, scl_oe=%b, scl_i=%b, sda_oe=%b, sda_i=%b\n",
+                $time, scl_oe, i2c_if_inst.scl_i, sda_oe, i2c_if_inst.sda_i);
+        $display("[BUS_MON %t] *** START CONDITION DETECTED *** scl_i=%b sda_i=%b",
+                 $time, i2c_if_inst.scl_i, i2c_if_inst.sda_i);
+      end
+      // Detect STOP: SDA rises while SCL=1
+      if (prev_sda_i === 1'b0 && i2c_if_inst.sda_i === 1'b1 && i2c_if_inst.scl_i === 1'b1) begin
+        $fwrite(mon_fd, "%t, STOP, scl_oe=%b, scl_i=%b, sda_oe=%b, sda_i=%b\n",
+                $time, scl_oe, i2c_if_inst.scl_i, sda_oe, i2c_if_inst.sda_i);
+        $display("[BUS_MON %t] *** STOP CONDITION DETECTED *** scl_i=%b sda_i=%b",
+                 $time, i2c_if_inst.scl_i, i2c_if_inst.sda_i);
+      end
+      // Track SCL edges for debug
+      if (prev_scl_i !== i2c_if_inst.scl_i) begin
+        $fwrite(mon_fd, "%t, SCL_EDGE=%b->%b, scl_oe=%b, sda_i=%b\n",
+                $time, prev_scl_i, i2c_if_inst.scl_i, scl_oe, i2c_if_inst.sda_i);
+        prev_scl_i = i2c_if_inst.scl_i;
+      end
+      prev_sda_i <= i2c_if_inst.sda_i;
+    end
+  end
+
+  final begin
+    $fclose(mon_fd);
+    $display("Bus monitor: scl_oe_changes=%0d sda_oe_changes=%0d", scl_oe_changes, sda_oe_changes);
+  end
 
   // UVM run task
   initial begin
@@ -83,16 +142,6 @@ module tb_top;
 
     // Run test
     run_test();
-  end
-
-  // Debug monitor for I2C bus activity
-  initial begin
-    forever begin
-      @(posedge i2c_if_inst.scl_o);
-      if (i2c_if_inst.sda_o === 1'b0 && i2c_if_inst.scl_o === 1'b0) begin
-        $display("[I2C_DBG %t] START detected: scl_o=%b, sda_o=%b", $time, i2c_if_inst.scl_o, i2c_if_inst.sda_o);
-      end
-    end
   end
 
 endmodule : tb_top

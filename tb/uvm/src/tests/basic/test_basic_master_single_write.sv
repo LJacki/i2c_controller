@@ -22,10 +22,10 @@ class test_basic_master_single_write extends base_test;
     // 3. Set SCL timing for Fast-mode (400kHz): FS_HCNT=60, FS_LCNT=130
     apb_write(8'h18, 16'd60);
     apb_write(8'h1C, 16'd130);
-    // 4. Enable I2C controller: ENABLE=1
+    // 4. Write DATA_CMD: DAT=0xAA, CMD=0 (write transaction) - BEFORE ENABLE
+    apb_write(8'h0C, {24'b0, 8'hAA});
+    // 5. Enable I2C controller: ENABLE=1 - triggers FSM to start transaction
     apb_write(8'h34, 32'h1);
-    // 5. Write DATA_CMD: DAT=0xAA, CMD=0 (write transaction)
-    apb_write(8'h0C, {24'b0, 8'hAA});  // CMD=0 implicitly (data[8]=0)
     // 6. Wait for transaction to complete
     #100us;
 
@@ -38,23 +38,22 @@ class test_basic_master_single_write extends base_test;
   end
   endtask
 
-  // Fixed APB write - proper APB protocol with SETUP then ACCESS phase
+  // APB write with proper SETUP/ACCESS/IDLE phases (blocking assignments)
   task apb_write(input logic [7:0] addr, input logic [31:0] data);
     virtual apb_if vif = env.apb_drv.vif;
-    // SETUP phase: psel=1, penable=0, drive address and data
+    // SETUP phase
     @(posedge vif.pclk);
     vif.psel    = 1'b1;
     vif.penable = 1'b0;
     vif.pwrite  = 1'b1;
     vif.paddr   = addr;
     vif.pwdata  = data;
-    // ACCESS phase: penable=1, address and data must be stable
+    // ACCESS phase
     @(posedge vif.pclk);
     vif.penable = 1'b1;
-    // Wait for slave to respond
     @(posedge vif.pclk);
     while (!vif.pready) @(posedge vif.pclk);
-    // Return to IDLE: penable=0, then psel=0
+    // IDLE phase
     @(posedge vif.pclk);
     vif.penable = 1'b0;
     vif.psel    = 1'b0;
@@ -74,6 +73,7 @@ class test_basic_master_single_write extends base_test;
     @(posedge vif.pclk);
     while (!vif.pready) @(posedge vif.pclk);
     data = vif.prdata;
+    // IDLE phase
     @(posedge vif.pclk);
     vif.penable = 1'b0;
     vif.psel    = 1'b0;

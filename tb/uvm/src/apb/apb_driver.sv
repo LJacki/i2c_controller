@@ -24,17 +24,14 @@ class apb_driver extends uvm_driver #(apb_transfer);
     seq_item_port.connect(sequencer.seq_item_export);
   endfunction
 
-  // Keep run_phase alive but idle - test drives APB signals directly
+  // NOTE: Do NOT drive APB signals here.
+  // Test directly drives vif via env.apb_drv.vif for maximum control.
+  // Driving signals here creates NBA conflicts with test's blocking assignments.
   task run_phase(uvm_phase phase);
-    forever begin
-      @(posedge vif.pclk);
-      // Idle: keep APB signals de-asserted
-      vif.psel    <= 1'b0;
-      vif.penable <= 1'b0;
-      vif.pwrite  <= 1'b0;
-      vif.paddr   <= 8'h0;
-      vif.pwdata  <= 32'h0;
-    end
+    // Stay alive but do nothing - let test drive all APB signaling
+    phase.raise_objection(this);
+    #(1000s);  // Wait forever (until test ends)
+    phase.drop_objection(this);
   endtask
 
 endclass : apb_driver
