@@ -13,6 +13,7 @@ class test_basic_master_single_write extends base_test;
   begin
     logic [31:0] status;
     phase.raise_objection(this);
+    #150ns;  // Wait for reset to complete
     `uvm_info("TEST_BASIC_MASTER_SINGLE_WRITE", "Starting Basic Master Single Write Test...", UVM_MEDIUM)
 
     // 1. Set target address TAR=0x3C (bit[9:0]=0x03C)
@@ -24,14 +25,19 @@ class test_basic_master_single_write extends base_test;
     apb_write(8'h1C, 16'd130);
     // 4. Write DATA_CMD: DAT=0xAA, CMD=0 (write transaction) - BEFORE ENABLE
     apb_write(8'h0C, {24'b0, 8'hAA});
+    #500ns;  // Wait for TX FIFO to settle before enabling controller
     // 5. Enable I2C controller: ENABLE=1 - triggers FSM to start transaction
     apb_write(8'h34, 32'h1);
     // 6. Wait for transaction to complete
-    #100us;
+    #200us;  // Wait for I2C transaction to complete
 
     // Verify TX FIFO is empty (TFE=1)
     apb_read(8'h38, status);
     `uvm_info("TEST_BASIC_MASTER_SINGLE_WRITE", $sformatf("STATUS=0x%08h", status), UVM_MEDIUM)
+
+    // Disable I2C controller to stop FSM
+    apb_write(8'h34, 32'h0);  // ENABLE = 0
+    #1us;  // Wait for FSM to settle
 
     `uvm_info("TEST_BASIC_MASTER_SINGLE_WRITE", "Master Single Write Test PASSED", UVM_MEDIUM)
     phase.drop_objection(this);

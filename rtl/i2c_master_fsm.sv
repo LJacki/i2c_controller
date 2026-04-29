@@ -258,8 +258,12 @@ module i2c_master_fsm (
 
                 ST_ADDR_BIT: begin
                     if (scl_falling) begin
-                        tx_shift <= {tx_shift[6:0], 1'b0};
-                        bit_cnt  <= bit_cnt + 1'b1;
+                        if (bit_cnt == 4'd0)
+                            tx_shift <= tx_byte;  // Load on first bit
+                        else
+                            tx_shift <= {1'b0, tx_shift[7:1]};
+                        if (bit_cnt < 4'd9)
+                            bit_cnt  <= bit_cnt + 1'b1;
                     end
                 end
 
@@ -276,8 +280,12 @@ module i2c_master_fsm (
 
                 ST_WDATA_BIT: begin
                     if (scl_falling) begin
-                        tx_shift <= {tx_shift[6:0], 1'b0};
-                        bit_cnt  <= bit_cnt + 1'b1;
+                        if (bit_cnt == 4'd0)
+                            tx_shift <= cur_dat;  // Load on first bit
+                        else
+                            tx_shift <= {1'b0, tx_shift[7:1]};
+                        if (bit_cnt < 4'd9)
+                            bit_cnt  <= bit_cnt + 1'b1;
                     end
                 end
 
@@ -295,7 +303,8 @@ module i2c_master_fsm (
                 ST_RDATA_BIT: begin
                     if (scl_rising) begin
                         rx_shift <= {rx_shift[6:0], sda_i_sync};
-                        bit_cnt  <= bit_cnt + 1'b1;
+                        if (bit_cnt < 4'd9)
+                            bit_cnt  <= bit_cnt + 1'b1;
                     end
                 end
 
@@ -341,7 +350,7 @@ module i2c_master_fsm (
 
             ST_ADDR_ACK, ST_WDATA_ACK: begin
                 sda_drive   = (bit_cnt == 4'd8) ? 1'b0 : 1'b1;
-                sda_drive_en = (bit_cnt >= 4'd8);
+                sda_drive_en = (bit_cnt < 4'd8);  // ACK bit: master releases SDA, slave drives
             end
 
             ST_RDATA_BIT: begin

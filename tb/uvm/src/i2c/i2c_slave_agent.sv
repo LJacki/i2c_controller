@@ -78,16 +78,13 @@ class i2c_slave_agent extends uvm_driver #(i2c_transfer);
     logic nack;
     logic [7:0] tx_byte;
 
-    // Receive address
-    recv_byte_noack(addr_byte);
+    // Receive address + drive ACK immediately after last bit's falling edge
+    recv_byte_noack(addr_byte, 1'b1);
     read_bit = addr_byte[0];
     matched = (addr_byte[7:1] == slave_addr);
     `uvm_info("I2C_SLAVE", $sformatf("ADDR=0x%02x R/W=%b matched=%b", addr_byte[7:1], read_bit, matched), UVM_MEDIUM)
 
-    // ACK address
-    if (matched) begin
-      drive_ack();
-    end else begin
+    if (!matched) begin
       return;
     end
 
@@ -104,11 +101,12 @@ class i2c_slave_agent extends uvm_driver #(i2c_transfer);
     end else begin
       // Master writes: slave receives bytes
       forever begin
-        recv_byte_noack(rx_byte);
+        // receive data byte (no ACK drive after data byte - master drives ACK/NACK)
+        recv_byte_noack(rx_byte, 1'b0);
         sample_nack(nack);
         `uvm_info("I2C_SLAVE", $sformatf("RX=0x%02x nack=%b", rx_byte, nack), UVM_MEDIUM)
         if (nack) break;
-        drive_ack();
+        // Master sent ACK, continue receiving
       end
     end
   endtask
@@ -117,13 +115,34 @@ class i2c_slave_agent extends uvm_driver #(i2c_transfer);
   // Bus primitives (all tasks - no function timing)
   // ============================================================
 
-  // Receive 8 bits from master (no ACK)
-  task recv_byte_noack(output logic [7:0] data);
+  // Receive 8 bits from master.
+  // After the last bit's falling edge, immediately drive ACK if drive_ack_after=1.
+  // FIX: ACK must be driven at the falling edge of the last bit (start of ACK bit),
+  // NOT at the falling edge of the next byte's bit 0. By driving immediately when
+  // SCL is already low, the master sees ACK at its sample point.
+  task recv_byte_noack(output logic [7:0] data, input bit drive_ack_after = 0);
     data = 0;
     for (int i=7; i>=0; i--) begin
       @(posedge vif.scl_i);
       #80ns;
       data[i] = vif.sda_i;
+      // Wait for this bit's falling edge (marks end of this bit's transfer)
+      @(negedge vif.scl_i);
+    end
+    // At this point SCL is low (ACK bit period). Drive ACK immediately
+    // so master sees it at the ACK bit's rising edge sample point.
+    if (drive_ack_after) begin
+      fork
+        begin
+          // SCL is already low - drive ACK immediately (no wait)
+          vif.slv_sda_o <= 1'b0;
+          vif.slv_sda_oe <= 1'b1;
+          @(posedge vif.scl_i);  // Wait for rising edge (end of ACK bit)
+          #80ns;
+          vif.slv_sda_oe <= 1'b0;
+          vif.slv_sda_o <= 1'b0;
+        end
+      join_none
     end
   endtask
 
@@ -137,12 +156,12 @@ class i2c_slave_agent extends uvm_driver #(i2c_transfer);
   // Drive ACK: pull SDA low for ACK bit
   task drive_ack();
     @(negedge vif.scl_i);
-    vif.sda_o  <= 1'b0;
-    vif.sda_oe <= 1'b1;
+    vif.slv_sda_o <= 1'b0;
+    vif.slv_sda_oe <= 1'b1;
     @(posedge vif.scl_i);
     #80ns;
-    vif.sda_oe <= 1'b0;
-    vif.sda_o  <= 1'b0;
+    vif.slv_sda_oe <= 1'b0;
+    vif.slv_sda_o <= 1'b0;
   endtask
 
   // Drive one byte onto SDA then release
@@ -150,14 +169,13 @@ class i2c_slave_agent extends uvm_driver #(i2c_transfer);
     // Drive 8 bits
     for (int i=7; i>=0; i--) begin
       @(negedge vif.scl_i);
-      vif.sda_o  <= data[i];
-      vif.sda_oe <= 1'b1;
+      vif.slv_sda_o <= data[i];
+      vif.slv_sda_oe <= 1'b1;
     end
     // Release SDA for ACK bit (let master drive ACK)
     @(negedge vif.scl_i);
-    vif.sda_oe <= 1'b0;
-    vif.sda_o  <= 1'b0;
+    vif.slv_sda_oe <= 1'b0;
+    vif.slv_sda_o <= 1'b0;
   endtask
 
 endclass : i2c_slave_agent
-
